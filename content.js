@@ -115,7 +115,7 @@ async function checkPlaybackCapabilities(videos,audios,atmos){
   if(audioUnknown)notices.push('音声：最高音質の再生対応状況を確認できませんでした。');
   else notices.push('音声：この環境では最大 '+audioLabel(bestAudio)+' での再生が可能と判定されました。最高音質で視聴するにはU-NEXTの対応端末で再生する必要があります。');
  }
- return {note:notices.join('\\n'),detail:details};
+ return {note:notices.join('\n'),detail:details};
 }
 async function run(){const id=++runId;busy=true;const links=rootOf()?.getElementById('official-links');if(links)links.hidden=true;render('照会中','確認中','音声情報を取得中','確認中','画質情報を取得中','配信情報を解析しています。','');
 const fail=e=>{if(id!==runId)return;busy=false;render('取得失敗','判定不能','音声情報を取得できませんでした','判定不能','画質情報を取得できませんでした',String(e.message||e),'エラー: '+String(e.message||e))};
@@ -132,7 +132,7 @@ const detail='作品: '+data.title+' / '+data.ep+'\nAtmos(MPD): '+(parsed.mpdAtm
 render('解析完了',audioMain,audioSub,videoMain,videoSub,note,detail);
 const capability=await checkPlaybackCapabilities(parsed.vid,parsed.aud,atmos);
 if(id!==runId)return;
-render('解析完了',audioMain,audioSub,videoMain,videoSub,capability.note,detail+'\\n再生対応判定: '+capability.detail);
+render('解析完了',audioMain,audioSub,videoMain,videoSub,capability.note,detail+'\n再生対応判定: '+capability.detail);
 busy=false;return;
 }catch(e){last=e}}throw last||Error('MPD解析失敗')}
 catch(e){fail(e)}}
