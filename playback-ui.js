@@ -10,7 +10,14 @@ function mount(){
  for(const btn of document.querySelectorAll('[data-testid="player-setting-show"]')){
   const parent=btn.parentElement;if(!parent||parent.nextElementSibling?.classList.contains(CLS))continue;
   const el=document.createElement('span');el.className=CLS;
-  el.style.cssText='display:inline-flex;align-items:center;justify-content:center;margin:0 8px 0 10px;padding:5px 10px;border:1px solid rgba(255,255,255,.3);border-radius:7px;background:rgba(4,13,29,.65);color:white;font-size:12px;line-height:1.35;white-space:pre-line;pointer-events:none';
+  el.style.cssText='display:inline-grid;grid-template-columns:max-content max-content max-content;column-gap:13px;row-gap:5px;align-items:center;margin:0 8px 0 10px;padding:9px 12px;border:1px solid rgba(255,255,255,.3);border-radius:8px;background:rgba(4,13,29,.75);color:white;font-size:12px;line-height:1.4;white-space:nowrap;pointer-events:none;max-width:calc(100vw - 36px);overflow-x:auto';
+  for(const [name,style] of [['empty',''],['video-head','color:#b3bfcd;font-size:11px;font-weight:600'],['audio-head','color:#b3bfcd;font-size:11px;font-weight:600'],['current-label','color:#b3bfcd;font-size:11px'],['current-video','font-weight:600'],['current-audio','font-weight:600'],['highest-label','color:#b3bfcd;font-size:11px'],['highest-video','font-weight:600'],['highest-audio','font-weight:600']]){
+   const cell=document.createElement('span');cell.dataset.uaiCell=name;cell.style.cssText=style+';white-space:nowrap';el.append(cell);
+  }
+  el.querySelector('[data-uai-cell="video-head"]').textContent='映像';
+  el.querySelector('[data-uai-cell="audio-head"]').textContent='音声';
+  el.querySelector('[data-uai-cell="current-label"]').textContent='現在';
+  el.querySelector('[data-uai-cell="highest-label"]').textContent='最高';
   parent.after(el);
  }
  draw();
@@ -70,9 +77,19 @@ async function loadPlaylistHighest(){
 
 function draw(){
  const v=video(),w=v?.videoWidth||last?.video?.width||last?.track?.width||last?.stats?.width,h=v?.videoHeight||last?.video?.height||last?.track?.height;
- const identified=last?.track?.audioCodec?trackAudio(last.track):null;
- const text='現在：映像 '+q(w,h)+' · 音声 '+(identified||(mseAudio()||'取得不可'))+'\n最高品質：'+highestQuality();
- for(const el of document.querySelectorAll('.'+CLS))el.textContent=text;
+ const currentVideo=q(w,h),currentAudio=last?.track?.audioCodec?trackAudio(last.track):(mseAudio()||'取得不可');
+ const highest=playlistHighest;
+ const separator=' · 音声 ';
+ const index=highest?.indexOf(separator)??-1;
+ const highestVideo=index>=0?highest.slice(0,index).replace(/^映像 /,''):'確認中';
+ const highestAudio=index>=0?highest.slice(index+separator.length):'確認中';
+ for(const el of document.querySelectorAll('.'+CLS)){
+  const cells={currentVideo,currentAudio,highestVideo,highestAudio};
+  for(const [name,value] of Object.entries(cells)){
+   const cell=el.querySelector('[data-uai-cell="'+name.replace(/[A-Z]/g,x=>'-'+x.toLowerCase())+'"]');
+   if(cell)cell.textContent=value;
+  }
+ }
 }
 async function reinject(){if(!enabled)return;try{await chrome.runtime.sendMessage({type:'PLAYBACK_HOOK'})}catch{}}
 function query(){
