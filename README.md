@@ -133,7 +133,10 @@ Dolby音声または4Kの配信がある作品では、カード内にU-NEXT公�
 1. Firefoxのアドレスバーに `about:debugging` と入力します。
 2. 左側の <strong>この Firefox</strong> を選びます。
 3. <strong>一時的なアドオンを読み込む…</strong> をクリックします。
-4. 解凍したフォルダの `manifest.json` を選びます。
+4. 解凍したフォルダ内で、元の `manifest.json` を `manifest.chromium.json` に名前変更し、`manifest.firefox.json` を `manifest.json` に名前変更します。
+5. Firefoxで、その `manifest.json` を選びます。
+
+※Firefoxでは専用の設定ファイルを使用します。Chrome・Edgeなどでは元の `manifest.json` をそのまま使用してください。
 
 ### インストール後・更新方法
 
