@@ -45,12 +45,13 @@ const t=setInterval(watch,200);setTimeout(()=>clearInterval(t),90000);
 window.addEventListener('message',e=>{
  if(e.source!==window||e.data?.source!=='UAI_PLAYBACK_REQUEST')return;
  watch();const v=document.querySelector('video');
- let track=null,stats=null;
- try{if(player){track=(player.getVariantTracks?.()||[]).find(x=>x.active)||null;stats=player.getStats?.()||null}}catch{}
+ let track=null,stats=null,variants=[];
+ try{if(player){variants=player.getVariantTracks?.()||[];track=variants.find(x=>x.active)||null;stats=player.getStats?.()||null}}catch{}
  window.postMessage({source:'UAI_PLAYBACK_RESULT',id:e.data.id,data:{
   video:v?{width:v.videoWidth,height:v.videoHeight,readyState:v.readyState}:null,
   track:track?{width:track.width,height:track.height,audioCodec:track.audioCodec,channelsCount:track.channelsCount}:null,
   stats:stats?{width:stats.width,height:stats.height}:null,
+  variants:variants.map(x=>({width:x.width,height:x.height,audioCodec:x.audioCodec,videoCodec:x.videoCodec,channelsCount:x.channelsCount,bandwidth:x.bandwidth,allowedByApplication:x.allowedByApplication,allowedByKeySystem:x.allowedByKeySystem})),
   mse:{hooked:mse.hooked,sourceBuffers:mse.sourceBuffers.map(x=>({...x})),appendCount:mse.appendCount}
  }},location.origin);
 });
