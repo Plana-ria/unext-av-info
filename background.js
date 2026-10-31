@@ -1,9 +1,7 @@
 chrome.runtime.onMessage.addListener((m,s,send)=>{
  if(!s.tab?.url?.startsWith('https://video.unext.jp/'))return;
  if(m?.type==='PLAYBACK_HOOK'){chrome.scripting.executeScript({target:{tabId:s.tab.id},world:'MAIN',files:['playback-hook.js']}).then(()=>send({ok:true})).catch(e=>send({error:String(e.message||e)}));return true;}
- if(m?.type==='INJECT'){
-  chrome.scripting.executeScript({target:{tabId:s.tab.id},world:'MAIN',files:['probe.js']}).then(()=>send({ok:true})).catch(e=>send({error:e.message}));return true;
- }
+ if(m?.type==='INJECT'){send({ok:true});return false;}
  if(m?.type==='FETCH'){
   (async()=>{
    try{
