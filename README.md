@@ -82,42 +82,47 @@ Dolby音声または4Kの配信がある作品では、カード内にU-NEXT公�
 <details>
 <summary><strong>Brave</strong></summary>
 
-1. アドレスバーに `brave://extensions/` と入力します。
-2. **デベロッパーモード**（Developer mode）をオンにします。
-3. **パッケージ化されていない拡張機能を読み込む**（Load unpacked）から `manifest.json` のあるフォルダを選びます。
-
-Brave Shieldsなどの保護設定により、U-NEXTでの動作が変わる場合があります。
+<ol>
+<li>アドレスバーに <code>brave://extensions/</code> と入力します。</li>
+<li><strong>デベロッパーモード</strong>（Developer mode）をオンにします。</li>
+<li><strong>パッケージ化されていない拡張機能を読み込む</strong>（Load unpacked）から <code>manifest.json</code> のあるフォルダを選びます。</li>
+</ol>
+<p>Brave Shieldsなどの保護設定により、U-NEXTでの動作が変わる場合があります。</p>
 
 </details>
 
 <details>
 <summary><strong>Vivaldi</strong></summary>
 
-1. アドレスバーに `vivaldi://extensions/` と入力するか、メニューの **ツール → 拡張機能**を開きます。
-2. **開発者モード**（Developer mode）をオンにします。
-3. **解凍してロード**（Load unpacked）から `manifest.json` のあるフォルダを選びます。
+<ol>
+<li>アドレスバーに <code>vivaldi://extensions/</code> と入力するか、メニューの <strong>ツール → 拡張機能</strong>を開きます。</li>
+<li><strong>開発者モード</strong>（Developer mode）をオンにします。</li>
+<li><strong>解凍してロード</strong>（Load unpacked）から <code>manifest.json</code> のあるフォルダを選びます。</li>
+</ol>
 
 </details>
 
 <details>
 <summary><strong>Opera / Opera GX</strong></summary>
 
-1. アドレスバーに `opera://extensions/` と入力します（拡張機能管理画面を開きます）。
-2. **開発者モード**（Developer mode）を有効にします。
-3. **解凍済み拡張機能を読み込む**（Load unpacked）から `manifest.json` のあるフォルダを選びます。
-
-※Opera / Opera GXではバージョンによって画面上の名称が異なる場合があります。
+<ol>
+<li>アドレスバーに <code>opera://extensions/</code> と入力します（拡張機能管理画面を開きます）。</li>
+<li><strong>開発者モード</strong>（Developer mode）を有効にします。</li>
+<li><strong>解凍済み拡張機能を読み込む</strong>（Load unpacked）から <code>manifest.json</code> のあるフォルダを選びます。</li>
+</ol>
+<p>※Opera / Opera GXではバージョンによって画面上の名称が異なる場合があります。</p>
 
 </details>
 
 <details>
 <summary><strong>Arc（デスクトップ版）</strong></summary>
 
-1. Arcの拡張機能管理画面を開きます（`arc://extensions/` またはメニューの拡張機能管理）。
-2. **Developer mode** をオンにします。
-3. **Load unpacked** から `manifest.json` のあるフォルダを選びます。
-
-※Arcはプラットフォームやバージョンによって拡張機能管理画面が異なる場合があります。
+<ol>
+<li>Arcの拡張機能管理画面を開きます（<code>arc://extensions/</code> またはメニューの拡張機能管理）。</li>
+<li><strong>Developer mode</strong> をオンにします。</li>
+<li><strong>Load unpacked</strong> から <code>manifest.json</code> のあるフォルダを選びます。</li>
+</ol>
+<p>※Arcはプラットフォームやバージョンによって拡張機能管理画面が異なる場合があります。</p>
 
 </details>
 
