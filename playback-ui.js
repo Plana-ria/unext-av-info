@@ -1,5 +1,5 @@
 (()=>{if(window.__uaiPlaybackUi)return;window.__uaiPlaybackUi=true;
-const CLS='uai-playback-info';let enabled=false,playlistHighest=null,playlistBusy=false,playlistKey='',playlistRetryAt=0;let serial=0,waiting=false,last=null,lastReply=0,lastPath='';
+const CLS='uai-playback-info';let enabled=false,playlistHighest=null,playlistBusy=false,playlistKey='',playlistAttempts=0,playlistGeneration=0;let serial=0,waiting=false,last=null,lastReply=0,lastPath='';
 function q(w,h){return !w||!h?'取得不可':h>=2160?'4K UHD':h>=1080?'Full HD':h>=720?'HD':h+'p'}
 function audio(t,ch){const name=/ec-3/i.test(t)?'Dolby Digital Plus':/ac-3/i.test(t)?'Dolby Digital':/mp4a/i.test(t)?'AAC':'音声形式不明';return name+' ('+(ch===2?'2.0ch':ch===1?'1.0ch':ch===6?'5.1ch':ch?ch+'ch・配置未確認':'ch未確認')+')'}
 function trackAudio(t){if(!t?.audioCodec)return '取得不可';return audio(t.audioCodec,t.channelsCount)}
@@ -28,31 +28,46 @@ function highestQuality(){
  if(!playlistHighest)return '映像 確認中 · 音声 確認中';
  return playlistHighest;
 }
+function resetPlaylist(){
+ if(playlistBusy)window.postMessage({source:'UAI_CANCEL_PLAYBACK_QUERY',id:playlistKey+'|'+playlistGeneration},location.origin);
+ playlistGeneration++;playlistBusy=false;playlistHighest=null;playlistKey='';playlistAttempts=0;
+}
 async function loadPlaylistHighest(){
- if(!enabled||!location.pathname.startsWith('/play/')||playlistBusy||Date.now()<playlistRetryAt)return;
- const key=location.href;if(playlistKey===key&&playlistHighest)return;
- playlistBusy=true;playlistKey=key;
- const id='playback-'+Date.now(),replyData=()=>new Promise((resolve,reject)=>{
+ if(!enabled||!location.pathname.startsWith('/play/')||playlistBusy)return;
+ const key=location.href;
+ if(playlistKey!==key){resetPlaylist();playlistKey=key}
+ if(playlistHighest||playlistAttempts>=2)return;
+ const generation=playlistGeneration,id='playback-'+generation+'-'+(++serial);
+ playlistBusy=true;playlistAttempts++;
+ let cancelReply=()=>{};
+ const valid=()=>enabled&&location.href===key&&playlistGeneration===generation;
+ const replyData=()=>new Promise((resolve,reject)=>{
   const timer=setTimeout(()=>{window.removeEventListener('message',handler);reject(Error('プレイリスト応答タイムアウト'))},12000);
   function handler(e){if(e.source!==window||e.data?.source!=='UAI_PLAYBACK_PLAYLIST_RESULT'||e.data.id!==id)return;clearTimeout(timer);window.removeEventListener('message',handler);resolve(e.data.data)}
+  cancelReply=()=>{clearTimeout(timer);window.removeEventListener('message',handler);reject(Error('キャンセル'))};
   window.addEventListener('message',handler);
   window.postMessage({source:'UAI_PLAYBACK_QUERY',id},location.origin);
  });
  try{
   const result=await replyData();
+  if(!valid())return;
   if(result?.error)throw Error(result.error);
   if(!result?.mpds?.length)throw Error('MPD URLがありません');
-  // Same MPD and initialization-segment (dec3) analyzer used on the title page.
   const analyze=window.__uaiAnalyzePlaylist;
   if(typeof analyze!=='function')throw Error('共通MPD解析が利用できません');
-  const summary=await analyze(result.mpds);
-  if(enabled&&location.href===key){
-   playlistHighest='映像 '+summary.video+' · 音声 '+summary.audio;
-   draw();
-  }
+  const summary=await analyze(result.mpds,valid);
+  if(!valid())return;
+  playlistHighest='映像 '+summary.video+' · 音声 '+summary.audio;
+  draw();
  }catch(e){
-  if(enabled&&location.href===key){playlistHighest='映像 取得不可 · 音声 取得不可';playlistRetryAt=Date.now()+15000;draw()}
- }finally{playlistBusy=false}
+  if(!valid())return;
+  // Only transient network/time-out failures merit one retry; never repeat endlessly.
+  const temporary=/タイムアウト|通信|network|fetch|HTTP 5\\d\\d/i.test(String(e?.message||e));
+  if(!temporary||playlistAttempts>=2)playlistAttempts=2;
+  playlistHighest=playlistAttempts>=2?'映像 取得不可 · 音声 取得不可':null;
+  if(!playlistHighest)setTimeout(()=>{if(valid())loadPlaylistHighest()},1200);
+  draw();
+ }finally{cancelReply=()=>{};if(valid())playlistBusy=false}
 }
 
 function draw(){
@@ -72,11 +87,11 @@ function query(){
  const timer=setTimeout(()=>{done();if(!lastReply||Date.now()-lastReply>6000)reinject();draw()},2000);
  window.addEventListener('message',reply);window.postMessage({source:'UAI_PLAYBACK_REQUEST',id},location.origin);
 }
-function setEnabled(next){const was=enabled;enabled=next;if(!enabled){playlistHighest=null;playlistKey='';last=null;lastReply=0;document.querySelectorAll('.'+CLS).forEach(e=>e.remove())}else if(!was){last=null;lastReply=0;reinject();query()}}
+function setEnabled(next){const was=enabled;enabled=next;if(!enabled){resetPlaylist();last=null;lastReply=0;document.querySelectorAll('.'+CLS).forEach(e=>e.remove())}else if(!was){last=null;lastReply=0;reinject();query()}}
 chrome.runtime.onMessage.addListener(m=>{if(m?.type==='UAI_ENABLED_CHANGED')setEnabled(m.enabled!==false)});
 chrome.runtime.sendMessage({type:'UAI_GET_ENABLED'}).then(r=>setEnabled(r?.enabled!==false)).catch(()=>{});
 let scheduled=false;
 new MutationObserver(()=>{if(scheduled)return;scheduled=true;setTimeout(()=>{scheduled=false;mount()},350)}).observe(document.documentElement,{childList:true,subtree:true});
-setInterval(()=>{if(!enabled)return;if(lastPath!==location.href){lastPath=location.href;playlistHighest=null;playlistKey='';playlistRetryAt=0;last=null;lastReply=0}query()},2500);
+setInterval(()=>{if(!enabled)return;if(lastPath!==location.href){lastPath=location.href;resetPlaylist();last=null;lastReply=0}query()},2500);
 reinject();setTimeout(query,500);
 })();
