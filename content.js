@@ -26,19 +26,20 @@ function setOfficialHelpLinks(parsed){
  sh.getElementById('fourk-help').hidden=!fourk;
  sh.getElementById('official-links').hidden=!(dolby||fourk);
 }
-function channel(t){const c=String(t.config||'').toUpperCase();if(c==='F801')return '5.1ch';if(t.channels===1)return '1.0ch';if(t.channels===2)return '2.0ch';return t.channels?t.channels+'ch（構成未確認）':'構成不明'}
+function channel(t){const c=String(t.config||'').toUpperCase();if(c==='F801'&&/ec-3|ac-3/i.test(t.c))return '5.1ch';if(t.channels===1)return '1.0ch';if(t.channels===2)return '2.0ch';return t.channels?t.channels+'ch（構成未確認）':'構成不明'}
 function codec(s){if(/ec-3/i.test(s))return 'Dolby Digital Plus';if(/ac-3/i.test(s))return 'Dolby Digital';if(/mp4a/i.test(s))return 'AAC';if(/hvc1|hev1/i.test(s))return 'HEVC';if(/avc1/i.test(s))return 'H.264';return s||'不明'}
 function attrs(e,n){return e.getAttribute(n)}
 function mpdParse(xml){const d=new DOMParser().parseFromString(xml,'application/xml');if(d.querySelector('parsererror'))throw Error('MPD XML解析エラー');
-const aud=[],vid=[];for(const set of d.querySelectorAll('AdaptationSet')){const reps=[...set.querySelectorAll('Representation')];for(const r of reps){const mime=attrs(r,'mimeType')||attrs(set,'mimeType')||'',c=attrs(r,'codecs')||attrs(set,'codecs')||'',base=attrs(r,'bandwidth'),w=+(attrs(r,'width')||attrs(set,'width')||0),h=+(attrs(r,'height')||attrs(set,'height')||0);if(!/audio/i.test(mime)&&!/^(ec-3|ac-3|mp4a)/i.test(c)){if(w||h)vid.push({w,h,c,bitrate:+base||0,fps:attrs(r,'frameRate')||attrs(set,'frameRate')||''});continue}
-let ac=r.querySelector('AudioChannelConfiguration')||set.querySelector('AudioChannelConfiguration');const conf=ac?.getAttribute('value')||'';let channels=null;if(/^\d+$/.test(conf))channels=+conf;else if(/^F801$/i.test(conf))channels=6;
+const aud=[],vid=[];for(const set of d.querySelectorAll('AdaptationSet')){const reps=[...set.children].filter(e=>e.localName==='Representation');for(const r of reps){const mime=attrs(r,'mimeType')||attrs(set,'mimeType')||'',c=attrs(r,'codecs')||attrs(set,'codecs')||'',base=attrs(r,'bandwidth'),w=+(attrs(r,'width')||attrs(set,'width')||0),h=+(attrs(r,'height')||attrs(set,'height')||0);if(!/audio/i.test(mime)&&!/^(ec-3|ac-3|mp4a)/i.test(c)){if(w||h)vid.push({w,h,c,bitrate:+base||0,fps:attrs(r,'frameRate')||attrs(set,'frameRate')||''});continue}
+let ac=r.querySelector('AudioChannelConfiguration')||set.querySelector('AudioChannelConfiguration');const conf=ac?.getAttribute('value')||'';let channels=null;if(/^\d+$/.test(conf))channels=+conf;else if(/^F801$/i.test(conf)&&/ec-3|ac-3/i.test(c))channels=6;
 aud.push({c,channels,config:conf,bitrate:+base||0,rate:attrs(r,'audioSamplingRate')||attrs(set,'audioSamplingRate')||'',representation:r,adaptation:set})}}
-const mpdAtmos=[...d.querySelectorAll('SupplementalProperty,EssentialProperty')].some(p=>/EC3_ExtensionType/i.test(p.getAttribute('schemeIdUri')||'')&&/JOC/i.test(p.getAttribute('value')||''));return{aud,vid,mpdAtmos,d}}
+const mpdAtmos=[...d.querySelectorAll('SupplementalProperty,EssentialProperty')].some(p=>/EC3_ExtensionType/i.test(p.getAttribute('schemeIdUri')||'')&&/JOC/i.test(p.getAttribute('value')||'')&&!!aud.find(a=>/ec-3/i.test(a.c)));return{aud,vid,mpdAtmos,d}}
 function parseDec3(bytes){for(let i=0;i+12<bytes.length;i++){if(bytes[i+4]!==100||bytes[i+5]!==101||bytes[i+6]!==99||bytes[i+7]!==51)continue;const n=(bytes[i]*16777216+bytes[i+1]*65536+bytes[i+2]*256+bytes[i+3])>>>0;if(n<8||i+n>bytes.length)continue;const p=bytes.slice(i+8,i+n);const hex=[...p].map(v=>v.toString(16).padStart(2,'0')).join(' ');return {hex,atmos:p.length>=7&&p[p.length-2]===1&&p[p.length-1]>0,bytes:p.length}}return null}
 async function checkInit(parsed,mpdUrl){
 const direct=(n,name)=>[...n?.children||[]].find(x=>x.localName===name);
 const list=[];
-for(const t of parsed.aud.filter(t=>/ec-3/i.test(t.c)).slice(0,2)){
+const tracks=parsed.aud.filter(t=>/ec-3/i.test(t.c));let checked=0;
+for(const t of tracks.slice(0,8)){checked++;
  try{
   const r=t.representation,adapt=t.adaptation;
   let base=mpdUrl;
@@ -67,11 +68,11 @@ for(const t of parsed.aud.filter(t=>/ec-3/i.test(t.c)).slice(0,2)){
   if(box?.atmos)return {atmos:true,details:list.join('\n')};
  }catch(e){list.push('初期化セグメント: '+String(e.message||e).slice(0,160));}
 }
-return {atmos:false,details:list.join('\n')||'初期化情報なし'};
+return {atmos:false,details:(list.join('\n')||'初期化情報なし')+(tracks.length>checked?'\n未検査のE-AC-3トラック: '+(tracks.length-checked):'')};
 }
 
 function fpsNumber(s){if(!s)return 24;const [n,d]=String(s).split('/').map(Number);return Number.isFinite(n)&&n>0&&(!d||d>0)?n/(d||1):24}
-function channelCount(a){return Number(a.channels)||(/F801/i.test(a.config)?6:2)}
+function channelCount(a){return Number(a.channels)||(/F801/i.test(a.config)&&/ec-3|ac-3/i.test(a.c)?6:0)}
 function audioLabel(a){return codec(a.c)+' ('+channel(a)+')'}
 function videoLabel(v){return v.h>=2160?'4K UHD':v.h>=1080?'Full HD':v.h>=720?'HD':v.h+'p'}
 function makeCapabilitiesConfig(v,a){return {
@@ -101,12 +102,13 @@ async function checkPlaybackCapabilities(videos,audios,atmos){
  const bestVideo=supported.map(x=>x.v).sort((x,y)=>y.w*y.h-x.w*x.h||y.bitrate-x.bitrate)[0];
  const bestAudio=supported.map(x=>x.a).sort((x,y)=>channelCount(y)-channelCount(x)||(/ec-3/i.test(y.c)?1:0)-(/ec-3/i.test(x.c)?1:0)||y.bitrate-x.bitrate)[0];
  const videoBest=videos.slice().sort((a,b)=>b.w*b.h-a.w*a.h)[0];
- const audioBest=audios.slice().sort((a,b)=>channelCount(b)-channelCount(a)||b.bitrate-a.bitrate)[0];
+ const audioBest=audios.slice().sort((a,b)=>channelCount(b)-channelCount(a)||(/ec-3/i.test(b.c)?1:0)-(/ec-3/i.test(a.c)?1:0)||b.bitrate-a.bitrate)[0];
  const videoSame=bestVideo.w===videoBest.w&&bestVideo.h===videoBest.h&&bestVideo.c===videoBest.c;
  const audioSame=bestAudio.c===audioBest.c&&channelCount(bestAudio)===channelCount(audioBest);
  const videoUnknown=unknown.some(x=>x.v.w*x.v.h>=videoBest.w*videoBest.h&&x.v.c===videoBest.c);
  const audioUnknown=unknown.some(x=>x.a.c===audioBest.c&&channelCount(x.a)===channelCount(audioBest));
- const details='Widevine (SW_SECURE_CRYPTO / cenc) / 対応 '+supported.length+'件 / 非対応 '+results.filter(r=>r.state==='no').length+'件 / 未判定 '+unknown.length+'件';
+ const simultaneous=supported.some(x=>x.v===bestVideo&&x.a===bestAudio);
+ const details='Widevine (SW_SECURE_CRYPTO / cenc) / 対応 '+supported.length+'件 / 非対応 '+results.filter(r=>r.state==='no').length+'件 / 未判定 '+unknown.length+'件 / 個別最大品質の同時再生: '+(simultaneous?'対応判定あり':'対応判定なし');
  const notices=[];
  if(!videoSame){
   if(videoUnknown)notices.push('画質：最高画質の再生対応状況を確認できませんでした。');
@@ -125,7 +127,7 @@ const data=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{wind
 if(!valid())return;if(data.title&&data.title!==title)throw Error('作品IDが一致しません');if(data.error)throw Error(data.error);if(!data.mpds?.length)throw Error('MPD URLを取得できませんでした');let last;
 for(const url of data.mpds){try{const r=await chrome.runtime.sendMessage({type:'FETCH',url});if(r?.error)throw Error(r.error);const parsed=mpdParse(r.text);if(!parsed.aud.length&&!parsed.vid.length)throw Error('MPDに映像・音声情報がありません');
 const init=await checkInit(parsed,url);if(!valid())return;setOfficialHelpLinks(parsed);
-const aud=parsed.aud.sort((a,b)=>(b.channels||0)-(a.channels||0)||b.bitrate-a.bitrate),a=aud[0],best=parsed.vid.sort((a,b)=>b.w*b.h-a.w*a.h)[0];
+const aud=parsed.aud.sort((a,b)=>channelCount(b)-channelCount(a)||(/ec-3/i.test(b.c)?1:0)-(/ec-3/i.test(a.c)?1:0)||b.bitrate-a.bitrate),a=aud[0],best=parsed.vid.sort((a,b)=>b.w*b.h-a.w*a.h)[0];
 const atmos=parsed.mpdAtmos||init.atmos;const audioMain=atmos?'Dolby Atmos':a?channel(a):'不明',audioSub=a?codec(a.c):'音声情報なし';
 const videoMain=!best?'不明':best.h>=2160?'4K UHD':best.h>=1080?'Full HD':best.h>=720?'HD':best.h+'p',videoSub=best?best.w+'×'+best.h+' / '+codec(best.c):'映像情報なし';
 const note='この環境での再生対応状況を確認中です。';
