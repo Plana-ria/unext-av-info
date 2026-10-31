@@ -49,12 +49,89 @@ Dolby音声または4Kの配信がある作品では、カード内にU-NEXT公�
 
 ## インストール
 
-1. このリポジトリの **Code → Download ZIP** からダウンロードして解凍します。
-2. Chromeで`chrome://extensions/`を開き、**デベロッパーモード**を有効にします。
-3. **パッケージ化されていない拡張機能を読み込む**から、`manifest.json`のあるフォルダを選択します。
-4. U-NEXTを開き、作品詳細ページまたは再生ページで表示を確認します。
+デスクトップ版ブラウザ向けの手順です。**署名済みの拡張機能やストア公開は不要**で、Chromium系ブラウザでは開発者モードから読み込めます。Chrome・Edgeではブラウザを再起動してもインストール状態が維持されます。その他のChromium系でも同様のローカル読み込み方式を利用します。
 
-更新するときはファイルを差し替え、拡張機能管理画面で再読み込みしてください。
+### 共通の準備
+
+1. このリポジトリの **[Code → Download ZIP](https://github.com/Plana-ria/unext-av-info/archive/refs/heads/main.zip)** から最新版をダウンロードします。
+2. ZIPファイルを解凍します。**`manifest.json` が入っているフォルダ**を確認してください。
+3. 以下から使用するブラウザの手順に従って読み込みます。
+
+### Google Chrome
+
+1. アドレスバーに `chrome://extensions/` と入力します。
+2. **デベロッパーモード**をオンにします。
+3. **パッケージ化されていない拡張機能を読み込む**をクリックし、`manifest.json` のあるフォルダを選びます。
+
+### Microsoft Edge
+
+1. アドレスバーに `edge://extensions/` と入力します。
+2. **開発者モード**をオンにします。
+3. **展開して読み込み**（Load unpacked）をクリックし、`manifest.json` のあるフォルダを選びます。
+
+### その他のChromium系ブラウザ
+
+以下はChromeと同じ拡張機能を、署名なしでローカルから読み込む方法です。ブラウザごとの動作は未検証のため、インストール後に作品情報・再生情報を確認してください。
+
+<details>
+<summary><strong>Brave</strong></summary>
+
+1. アドレスバーに `brave://extensions/` と入力します。
+2. **デベロッパーモード**（Developer mode）をオンにします。
+3. **パッケージ化されていない拡張機能を読み込む**（Load unpacked）から `manifest.json` のあるフォルダを選びます。
+
+Brave Shieldsなどの保護設定により、U-NEXTでの動作が変わる場合があります。
+
+</details>
+
+<details>
+<summary><strong>Vivaldi</strong></summary>
+
+1. アドレスバーに `vivaldi://extensions/` と入力するか、メニューの **ツール → 拡張機能**を開きます。
+2. **開発者モード**（Developer mode）をオンにします。
+3. **解凍してロード**（Load unpacked）から `manifest.json` のあるフォルダを選びます。
+
+</details>
+
+<details>
+<summary><strong>Opera / Opera GX</strong></summary>
+
+1. アドレスバーに `opera://extensions/` と入力します（拡張機能管理画面を開きます）。
+2. **開発者モード**（Developer mode）を有効にします。
+3. **解凍済み拡張機能を読み込む**（Load unpacked）から `manifest.json` のあるフォルダを選びます。
+
+※Opera / Opera GXではバージョンによって画面上の名称が異なる場合があります。
+
+</details>
+
+<details>
+<summary><strong>Arc（デスクトップ版）</strong></summary>
+
+1. Arcの拡張機能管理画面を開きます（`arc://extensions/` またはメニューの拡張機能管理）。
+2. **Developer mode** をオンにします。
+3. **Load unpacked** から `manifest.json` のあるフォルダを選びます。
+
+※Arcはプラットフォームやバージョンによって拡張機能管理画面が異なる場合があります。
+
+</details>
+
+### Firefox（一時的なインストール）
+
+**Firefoxの通常版では、署名なしで読み込んだ拡張機能は一時的なインストールになります。Firefoxを終了・再起動すると削除されるため、次回は再度読み込みが必要です。** Chrome・Edgeなどの開発者モードによる永続的な読み込みとは異なります。
+
+1. Firefoxのアドレスバーに `about:debugging` と入力します。
+2. 左側の **この Firefox** を選びます。
+3. **一時的なアドオンを読み込む…** をクリックします。
+4. 解凍したフォルダの `manifest.json` を選びます。
+
+再起動後も継続して利用する通常のインストールには、原則としてMozillaの署名を受けたXPIファイルが必要です。自己配布（Unlisted）なら、Firefoxアドオンストアに一般公開せずに署名を取得できます。
+
+### インストール後・更新方法
+
+U-NEXTの作品詳細ページと再生ページを開き、表示を確認してください。すでにページを開いている場合は再読み込みしてください。
+
+- **Chromium系**：最新版のファイルに差し替えて拡張機能管理画面で **再読み込み**をクリックし、U-NEXTのページも再読み込みします。ローカル読み込み版は自動更新されません。
+- **Firefox**：`about:debugging` にある拡張機能の **再読み込み**をクリックします。Firefoxを再起動した場合は再度一時インストールしてください。
 
 ## 仕組みと制限事項
 
