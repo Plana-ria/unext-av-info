@@ -2,7 +2,7 @@
 
 // Track title IDs passed through GraphQL POST requests during SPA navigation.
 // Capture only public title identifiers; never store credentials or response bodies.
-let observedTitle=null,observedRoute=null,observedEpisode=null,extensionEnabled=false;
+let observedTitle=null,observedRoute=null,observedEpisode=null,observedEpisodeRoute=null,extensionEnabled=false;
 function recordTitle(source){
  try{
   const items=Array.isArray(source)?source:[source];
@@ -11,7 +11,7 @@ function recordTitle(source){
    const op=String(item.operationName||'');
    if(!['cosmo_getVideoTitle','cosmo_getVideoTitleEpisodes','cosmo_getVideoTitleRelatedStuffs','cosmo_getPlaylistUrl'].includes(op))continue;
    const code=item.variables?.code;
-   if(op==='cosmo_getPlaylistUrl'&&typeof code==='string'&&/^ED\\d+$/.test(code)){observedEpisode=code;window.postMessage({source:'UAI_EPISODE_FOUND',episode:code},location.origin)}
+   if(op==='cosmo_getPlaylistUrl'&&typeof code==='string'&&/^ED\\d+$/.test(code)){observedEpisode=code;observedEpisodeRoute=location.href;window.postMessage({source:'UAI_EPISODE_FOUND',episode:code},location.origin)}
    if(typeof code==='string'&&/^SID\d+$/.test(code)){
     observedTitle=code;observedRoute=location.href;
     window.postMessage({source:'UAI_TITLE_FOUND',title:code},location.origin);
@@ -77,13 +77,17 @@ const profiles=(info.urlInfo||[]).flatMap(x=>x.movieProfile||[]);
 const mpds=profiles.map(p=>p.playlistUrl).filter(s=>typeof s==='string'&&s.includes('.mpd')).map(s=>{const u=new URL(s);if(info.playToken)u.searchParams.set('play_token',info.playToken);return u.href});
 send({title,ep,mpds:mpds.slice(0,3),codecs:[...new Set(profiles.flatMap(p=>(p.movieAudioList||[]).map(a=>a.audioType)))]});
 }catch(err){if(!controller.signal.aborted)send({title:m.title,error:String(err.message||err).slice(0,200)})}finally{activeQueries.delete(String(id))}});
+window.addEventListener('message',e=>{
+ if(e.source!==window||e.data?.source!=='UAI_CANCEL_PLAYBACK_QUERY')return;
+ for(const [id,controller] of activeQueries)if(id.startsWith('playback-')){controller.abort();activeQueries.delete(id)}
+});
 window.addEventListener('message',async e=>{
  const m=e.data;if(e.source!==window||m?.source!=='UAI_PLAYBACK_QUERY'||!extensionEnabled)return;
  const id=String(m.id||'');const ctrl=new AbortController();activeQueries.set(id,ctrl);
  const send=data=>window.postMessage({source:'UAI_PLAYBACK_PLAYLIST_RESULT',id,data},location.origin);
  try{
   const page=location.href;
-  let episode=location.pathname.match(/ED\d+/)?.[0]||observedEpisode;
+  let episode=location.pathname.match(/ED\d+/)?.[0]||(observedEpisodeRoute===location.href?observedEpisode:null);
   if(!episode)throw Error('再生エピソードID未検出');
   const x=await query('cosmo_getPlaylistUrl',{code:episode,playMode:'caption',bitrateLow:1500,bitrateHigh:null,validationOnly:false},hashes.playlist,ctrl.signal);
   if(ctrl.signal.aborted||!extensionEnabled||location.href!==page)return;
