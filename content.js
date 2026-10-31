@@ -100,8 +100,6 @@ async function checkPlaybackCapabilities(videos,audios,atmos){
  if(!audioSame){
   if(audioUnknown)notices.push('音声：最高音質の再生対応状況を確認できませんでした。');
   else notices.push('音声：この環境では最大 '+audioLabel(bestAudio)+' での再生が可能と判定されました。最高音質で視聴するにはU-NEXTの対応端末で再生する必要があります。');
- }else if(atmos&&/ec-3/i.test(audioBest.c)){
-  notices.push('音声：Dolby Atmosの再生可否はこのブラウザの能力判定だけでは確認できません。');
  }
  return {note:notices.join('\\n'),detail:details};
 }
