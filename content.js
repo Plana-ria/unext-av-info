@@ -7,7 +7,6 @@ window.addEventListener('message',e=>{
  if(e.source!==window||e.data?.source!=='UAI_TITLE_FOUND'||!/^SID\d+$/.test(e.data.title||''))return;
  if(observedTitle!==e.data.title){observedTitle=e.data.title;invalidate();schedule()}
 });
-window.postMessage({source:'UAI_GET_TITLE'},location.origin);
 const rootOf=()=>document.getElementById(ID)?.shadowRoot;
 function invalidate(){window.postMessage({source:'UAI_CANCEL_QUERY',id:runId},location.origin);++runId;busy=false;current='';const links=rootOf()?.getElementById('official-links');if(links)links.hidden=true;render('準備中','確認中','作品情報を待っています','確認中','作品情報を待っています','','')}
 function render(state,a,as,v,vs,note,detail){const sh=rootOf();if(!sh)return;for(const [k,value] of Object.entries({state,a,as,v,vs,note,detail}))sh.getElementById(k).textContent=value??'';sh.getElementById('note').hidden=!note;sh.getElementById('actions').hidden=state!=='取得失敗'}
@@ -215,7 +214,7 @@ function attach(){
  const key=title+'|'+location.pathname;
  if(key!==current||fresh){if(current&&current!==key)invalidate();current=key;run(title)}
 }
-function setEnabled(next){const was=enabled;enabled=next;if(!enabled){invalidate();document.getElementById(ID)?.remove()}else if(!was){observedTitle=null;resourceSince=0;window.postMessage({source:'UAI_GET_TITLE'},location.origin);schedule()}}
+function setEnabled(next){const was=enabled;enabled=next;window.postMessage({source:'UAI_SET_ENABLED',enabled},location.origin);if(!enabled){invalidate();document.getElementById(ID)?.remove()}else if(!was){observedTitle=null;resourceSince=0;window.postMessage({source:'UAI_GET_TITLE'},location.origin);schedule()}}
 chrome.runtime.onMessage.addListener(m=>{if(m?.type==='UAI_ENABLED_CHANGED')setEnabled(m.enabled!==false)});
 chrome.runtime.sendMessage({type:'UAI_GET_ENABLED'}).then(r=>setEnabled(r?.enabled!==false)).catch(()=>{});
 let pending=false;function schedule(){if(!enabled||pending)return;pending=true;setTimeout(()=>{pending=false;attach()},300)}
