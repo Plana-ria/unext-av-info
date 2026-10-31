@@ -77,4 +77,22 @@ const profiles=(info.urlInfo||[]).flatMap(x=>x.movieProfile||[]);
 const mpds=profiles.map(p=>p.playlistUrl).filter(s=>typeof s==='string'&&s.includes('.mpd')).map(s=>{const u=new URL(s);if(info.playToken)u.searchParams.set('play_token',info.playToken);return u.href});
 send({title,ep,mpds:mpds.slice(0,3),codecs:[...new Set(profiles.flatMap(p=>(p.movieAudioList||[]).map(a=>a.audioType)))]});
 }catch(err){if(!controller.signal.aborted)send({title:m.title,error:String(err.message||err).slice(0,200)})}finally{activeQueries.delete(String(id))}});
+window.addEventListener('message',async e=>{
+ const m=e.data;if(e.source!==window||m?.source!=='UAI_PLAYBACK_QUERY'||!extensionEnabled)return;
+ const id=String(m.id||'');const ctrl=new AbortController();activeQueries.set(id,ctrl);
+ const send=data=>window.postMessage({source:'UAI_PLAYBACK_PLAYLIST_RESULT',id,data},location.origin);
+ try{
+  const page=location.href;
+  let episode=location.pathname.match(/ED\d+/)?.[0]||observedEpisode;
+  if(!episode)throw Error('再生エピソードID未検出');
+  const x=await query('cosmo_getPlaylistUrl',{code:episode,playMode:'caption',bitrateLow:1500,bitrateHigh:null,validationOnly:false},hashes.playlist,ctrl.signal);
+  if(ctrl.signal.aborted||!extensionEnabled||location.href!==page)return;
+  const info=x?.webfront_playlistUrl;if(!info)throw Error('プレイリスト情報なし');
+  const profiles=(info.urlInfo||[]).flatMap(x=>x.movieProfile||[]);
+  const urls=profiles.map(p=>p.playlistUrl).filter(u=>typeof u==='string'&&u.includes('.mpd')).map(str=>{const u=new URL(str);if(info.playToken)u.searchParams.set('play_token',info.playToken);return u.href});
+  send({episode,mpds:[...new Set(urls)].slice(0,3)});
+ }catch(err){if(!ctrl.signal.aborted)send({error:String(err.message||err).slice(0,160)})}
+ finally{activeQueries.delete(id)}
+});
+
 })();
