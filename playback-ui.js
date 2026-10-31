@@ -74,7 +74,7 @@ async function loadPlaylistHighest(){
   const rank=c=>/ec-3/i.test(c||'')?3:/ac-3/i.test(c||'')?2:/mp4a/i.test(c||'')?1:0;
   const audios=parsed.flatMap(x=>x.audios).sort((a,b)=>(b.channels||0)-(a.channels||0)||rank(b.codec)-rank(a.codec));
   const v=videos[0],a=audios[0],atmos=parsed.some(x=>x.atmos);
-  if(enabled&&location.href===key){playlistHighest='映像 '+(v?q(v.width,v.height):'未確認')+' · 音声 '+(atmos?'Dolby Atmos ('+(a?.channels===6?'5.1ch':a?.channels===2?'2.0ch':a?.channels===1?'1.0ch':a?.channels?a.channels+'ch・配置未確認':'構成不明')+')':a?audio(a.codec,a.channels):'未確認');draw()}
+  if(enabled&&location.href===key){playlistHighest='映像 '+(v?q(v.width,v.height):'未確認')+' · 音声 '+(atmos?'Dolby Atmos':a?audio(a.codec,a.channels):'未確認');draw()}
  }catch(e){
   if(enabled&&location.href===key){playlistHighest='映像 取得不可 · 音声 取得不可';playlistRetryAt=Date.now()+15000;draw()}
  }finally{playlistBusy=false}
