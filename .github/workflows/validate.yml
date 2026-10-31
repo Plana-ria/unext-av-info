@@ -1,0 +1,20 @@
+name: Extension checks
+on:
+  push:
+  pull_request:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: |
+          for file in background.js probe.js content.js playback-hook.js playback-ui.js; do
+            node --check "$file"
+          done
+      - name: Validate manifests
+        run: |
+          node -e "const fs=require('node:fs');for(const f of ['manifest.json','manifest.firefox.json']){const m=JSON.parse(fs.readFileSync(f));if(m.manifest_version!==3||m.version!=='1.0.0')throw Error(f+' invalid manifest');if(f==='manifest.json'&&m.background.scripts)throw Error('Chromium manifest contains background.scripts');if(f.includes('firefox')&&!m.background.scripts)throw Error('Firefox manifest lacks background scripts');}"
