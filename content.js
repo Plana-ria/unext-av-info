@@ -201,7 +201,8 @@ for(const url of data.mpds){
   if(response?.error)throw Error(response.error);
   const parsed=mpdParse(response.text);
   if(!parsed.aud.length&&!parsed.vid.length)throw Error('MPDに映像・音声情報がありません');
-  const init=parsed.mpdAtmos?{atmos:true,details:'MPDにDolby Atmos (JOC) 情報あり'}:await checkInit(parsed,url,initCache);
+  const alreadyAtmos=groups.some(g=>g.parsed.mpdAtmos||g.init.atmos);
+  const init=parsed.mpdAtmos||alreadyAtmos?{atmos:parsed.mpdAtmos,details:parsed.mpdAtmos?'MPDにDolby Atmos (JOC) 情報あり':'他のMPDでAtmosを検出済み'}:await checkInit(parsed,url,initCache);
   if(!valid())return;
   groups.push({parsed,init});
  }catch(error){failures.push(describeError(error).detail)}
