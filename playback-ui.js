@@ -10,7 +10,7 @@ function mount(){
  for(const btn of document.querySelectorAll('[data-testid="player-setting-show"]')){
   const parent=btn.parentElement;if(!parent||parent.nextElementSibling?.classList.contains(CLS))continue;
   const el=document.createElement('span');el.className=CLS;
-  el.style.cssText='display:inline-grid;grid-template-columns:max-content max-content max-content;column-gap:13px;row-gap:5px;align-items:center;margin:0 8px 0 10px;padding:9px 12px;border:1px solid rgba(255,255,255,.3);border-radius:8px;background:rgba(4,13,29,.75);color:white;font-size:12px;line-height:1.4;white-space:nowrap;pointer-events:none;max-width:calc(100vw - 36px);overflow-x:auto';
+  el.style.cssText='display:inline-grid;grid-template-columns:max-content max-content max-content;column-gap:13px;row-gap:5px;align-items:center;margin:5px 8px 0 10px;padding:9px 12px;border:1px solid rgba(255,255,255,.3);border-radius:8px;background:rgba(4,13,29,.75);color:white;font-size:12px;line-height:1.4;white-space:nowrap;pointer-events:none;max-width:calc(100vw - 36px);overflow-x:auto';
   for(const [name,style] of [['empty',''],['video-head','color:#b3bfcd;font-size:11px;font-weight:600'],['audio-head','color:#b3bfcd;font-size:11px;font-weight:600'],['current-label','color:#b3bfcd;font-size:11px'],['current-video','font-weight:600'],['current-audio','font-weight:600'],['highest-label','color:#b3bfcd;font-size:11px'],['highest-video','font-weight:600'],['highest-audio','font-weight:600']]){
    const cell=document.createElement('span');cell.dataset.uaiCell=name;cell.style.cssText=style+';white-space:nowrap';el.append(cell);
   }
