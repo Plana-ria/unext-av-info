@@ -3,9 +3,9 @@ const ID='unext-av-info-card';let current='',busy=false,runId=0,lastUrl=location
 function sid(){const m=location.pathname.match(/SID\d+/);if(m)return m[0];const a=performance.getEntriesByType('resource');for(let i=a.length-1;i>=0;i--){try{const u=new URL(a[i].name);if(u.hostname!=='cc.unext.jp'||!['cosmo_getVideoTitle','cosmo_getVideoTitleEpisodes','cosmo_getVideoTitleRelatedStuffs'].includes(u.searchParams.get('operationName')))continue;const id=JSON.parse(u.searchParams.get('variables')||'{}').code;if(/^SID\d+$/.test(id))return id}catch{}}return null}
 function anchor(){return [...document.querySelectorAll('h2')].find(h=>h.textContent.trim()==='キャスト・スタッフ')?.parentElement}
 const rootOf=()=>document.getElementById(ID)?.shadowRoot;
-function render(state,a,as,v,vs,note,detail){const sh=rootOf();if(!sh)return;for(const [k,value] of Object.entries({state,a,as,v,vs,note,detail}))sh.getElementById(k).textContent=value??'';sh.getElementById('actions').hidden=state!=='取得失敗'}
+function render(state,a,as,v,vs,note,detail){const sh=rootOf();if(!sh)return;for(const [k,value] of Object.entries({state,a,as,v,vs,note,detail}))sh.getElementById(k).textContent=value??'';sh.getElementById('note').hidden=!note;sh.getElementById('actions').hidden=state!=='取得失敗'}
 function card(){const host=document.createElement('section');host.id=ID;const sh=host.attachShadow({mode:'open'});sh.innerHTML=`<style>
-:host{display:block;width:100%;margin:0 0 42px;color:#edf4fc;font:inherit}*{box-sizing:border-box}.panel{background:rgba(24,37,54,.77);border:1px solid #415264;border-radius:14px;padding:22px}header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}h2{font-size:23px;font-weight:700;color:white;margin:0}.state{font-size:12px;color:#c5d6e8}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.metric{border:1px solid #3a4e62;background:rgba(255,255,255,.04);border-radius:10px;padding:16px;min-width:0}.label{font-size:12px;color:#b5c8d9;margin-bottom:7px}.primary{font-size:21px;font-weight:700;overflow-wrap:anywhere}.sub{font-size:12px;color:#c4d2de;margin-top:5px;overflow-wrap:anywhere}.official-links{margin-top:14px;padding-top:12px;border-top:1px solid #415264}.official-links .help-link{display:block;width:fit-content;margin-top:8px}.help-link{display:inline-block;margin-top:10px;font-size:12px;color:#9bd4ff;text-decoration:underline;text-underline-offset:2px}.help-link:hover{color:#cdeaff}.help-link:focus-visible{outline:2px solid #9bd4ff;outline-offset:3px}.note{font-size:11px;color:#b2c1d2;margin-top:14px;line-height:1.7}details{margin-top:15px;font-size:12px;color:#c3d3df}summary{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;line-height:1.5}button{background:#29445f;border:1px solid #56718b;border-radius:7px;color:white;padding:8px 13px;cursor:pointer}#actions{margin-top:12px}#actions[hidden]{display:none!important}@media(max-width:650px){.grid{grid-template-columns:1fr}.panel{padding:15px}h2{font-size:19px}}</style>
+:host{display:block;width:100%;margin:0 0 42px;color:#edf4fc;font:inherit}*{box-sizing:border-box}.panel{background:rgba(24,37,54,.77);border:1px solid #415264;border-radius:14px;padding:22px}header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}h2{font-size:23px;font-weight:700;color:white;margin:0}.state{font-size:12px;color:#c5d6e8}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.metric{border:1px solid #3a4e62;background:rgba(255,255,255,.04);border-radius:10px;padding:16px;min-width:0}.label{font-size:12px;color:#b5c8d9;margin-bottom:7px}.primary{font-size:21px;font-weight:700;overflow-wrap:anywhere}.sub{font-size:12px;color:#c4d2de;margin-top:5px;overflow-wrap:anywhere}.official-links{margin-top:14px;padding-top:12px;border-top:1px solid #415264}.official-links .help-link{display:block;width:fit-content;margin-top:8px}.help-link{display:inline-block;margin-top:10px;font-size:12px;color:#9bd4ff;text-decoration:underline;text-underline-offset:2px}.help-link:hover{color:#cdeaff}.help-link:focus-visible{outline:2px solid #9bd4ff;outline-offset:3px}.note[hidden]{display:none}.note{white-space:pre-line;font-size:11px;color:#b2c1d2;margin-top:14px;line-height:1.7}details{margin-top:15px;font-size:12px;color:#c3d3df}summary{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;line-height:1.5}button{background:#29445f;border:1px solid #56718b;border-radius:7px;color:white;padding:8px 13px;cursor:pointer}#actions{margin-top:12px}#actions[hidden]{display:none!important}@media(max-width:650px){.grid{grid-template-columns:1fr}.panel{padding:15px}h2{font-size:19px}}</style>
 <div class="panel"><header><h2>音声・映像の配信情報</h2><span id="state" class="state">準備中</span></header><div class="grid">
 <div class="metric"><div class="label">音声</div><div class="primary" id="a">解析待ち</div><div class="sub" id="as">—</div></div>
 <div class="metric"><div class="label">画質</div><div class="primary" id="v">解析待ち</div><div class="sub" id="vs">—</div></div></div>
@@ -87,14 +87,23 @@ async function checkPlaybackCapabilities(videos,audios,atmos){
  const bestAudio=supported.map(x=>x.a).sort((x,y)=>channelCount(y)-channelCount(x)||(/ec-3/i.test(y.c)?1:0)-(/ec-3/i.test(x.c)?1:0)||y.bitrate-x.bitrate)[0];
  const videoBest=videos.slice().sort((a,b)=>b.w*b.h-a.w*a.h)[0];
  const audioBest=audios.slice().sort((a,b)=>channelCount(b)-channelCount(a)||b.bitrate-a.bitrate)[0];
- const videoLower=bestVideo.w*bestVideo.h<videoBest.w*videoBest.h;
- const audioLower=/ec-3|ac-3/i.test(audioBest.c)?!/ec-3|ac-3/i.test(bestAudio.c)||channelCount(bestAudio)<channelCount(audioBest):channelCount(bestAudio)<channelCount(audioBest);
- const blockedUnknown=unknown.some(x=>x.v.w*x.v.h>bestVideo.w*bestVideo.h||channelCount(x.a)>channelCount(bestAudio));
- if(blockedUnknown)return {note:'この環境で確認できた再生対応形式は映像 '+videoLabel(bestVideo)+'・音声 '+audioLabel(bestAudio)+' です。より高品質な形式の対応状況は確認できませんでした。',detail:'対応判定: 成功 '+supported.length+'件 / 未判定 '+unknown.length+'件'};
+ const videoSame=bestVideo.w===videoBest.w&&bestVideo.h===videoBest.h&&bestVideo.c===videoBest.c;
+ const audioSame=bestAudio.c===audioBest.c&&channelCount(bestAudio)===channelCount(audioBest);
+ const videoUnknown=unknown.some(x=>x.v.w*x.v.h>=videoBest.w*videoBest.h&&x.v.c===videoBest.c);
+ const audioUnknown=unknown.some(x=>x.a.c===audioBest.c&&channelCount(x.a)===channelCount(audioBest));
  const details='Widevine (SW_SECURE_CRYPTO / cenc) / 対応 '+supported.length+'件 / 非対応 '+results.filter(r=>r.state==='no').length+'件 / 未判定 '+unknown.length+'件';
- if(videoLower||audioLower)return {note:'この環境では最大 '+videoLabel(bestVideo)+'・'+audioLabel(bestAudio)+' での再生が可能と判定されました。上記の最高品質で視聴するにはU-NEXTの対応端末で再生する必要があります。',detail:details};
- if(atmos)return {note:'この環境では'+videoLabel(bestVideo)+'・'+audioLabel(bestAudio)+' の再生対応が確認できました。ただしDolby Atmosの再生可否はこの判定だけでは確認できません。',detail:details};
- return {note:'この環境ではカードに表示した最高画質・音声形式の再生対応が確認できました（実際の再生品質を保証するものではありません）。',detail:details};
+ const notices=[];
+ if(!videoSame){
+  if(videoUnknown)notices.push('画質：最高画質の再生対応状況を確認できませんでした。');
+  else notices.push('画質：この環境では最大 '+videoLabel(bestVideo)+'（'+codec(bestVideo.c)+'）での再生が可能と判定されました。最高画質で視聴するにはU-NEXTの対応端末で再生する必要があります。');
+ }
+ if(!audioSame){
+  if(audioUnknown)notices.push('音声：最高音質の再生対応状況を確認できませんでした。');
+  else notices.push('音声：この環境では最大 '+audioLabel(bestAudio)+' での再生が可能と判定されました。最高音質で視聴するにはU-NEXTの対応端末で再生する必要があります。');
+ }else if(atmos&&/ec-3/i.test(audioBest.c)){
+  notices.push('音声：Dolby Atmosの再生可否はこのブラウザの能力判定だけでは確認できません。');
+ }
+ return {note:notices.join('\\n'),detail:details};
 }
 async function run(){const id=++runId;busy=true;render('照会中','確認中','音声情報を取得中','確認中','画質情報を取得中','配信情報を解析しています。','');
 const fail=e=>{if(id!==runId)return;busy=false;render('取得失敗','判定不能','音声情報を取得できませんでした','判定不能','画質情報を取得できませんでした',String(e.message||e),'エラー: '+String(e.message||e))};
