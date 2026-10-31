@@ -54,6 +54,48 @@ for(const t of parsed.aud.filter(t=>/ec-3/i.test(t.c)).slice(0,2)){
 }
 return {atmos:false,details:list.join('\n')||'初期化情報なし'};
 }
+
+function fpsNumber(s){if(!s)return 24;const [n,d]=String(s).split('/').map(Number);return Number.isFinite(n)&&n>0&&(!d||d>0)?n/(d||1):24}
+function channelCount(a){return Number(a.channels)||(/F801/i.test(a.config)?6:2)}
+function audioLabel(a){return codec(a.c)+' ('+channel(a)+')'}
+function videoLabel(v){return v.h>=2160?'4K UHD':v.h>=1080?'Full HD':v.h>=720?'HD':v.h+'p'}
+function makeCapabilitiesConfig(v,a){return {
+ type:'media-source',
+ video:{contentType:'video/mp4; codecs="'+v.c+'"',width:v.w,height:v.h,bitrate:Math.max(1,v.bitrate),framerate:fpsNumber(v.fps)},
+ audio:{contentType:'audio/mp4; codecs="'+a.c+'"',channels:String(channelCount(a)),bitrate:Math.max(1,a.bitrate),samplerate:Number(a.rate)||48000,spatialRendering:false},
+ keySystemConfiguration:{keySystem:'com.widevine.alpha',initDataType:'cenc',
+ persistentState:'optional',distinctiveIdentifier:'optional',sessionTypes:['temporary'],
+ audio:{robustness:'SW_SECURE_CRYPTO',encryptionScheme:'cenc'},
+ video:{robustness:'SW_SECURE_CRYPTO',encryptionScheme:'cenc'}}
+}}
+async function checkPlaybackCapabilities(videos,audios,atmos){
+ if(!navigator.mediaCapabilities?.decodingInfo)return {note:'この環境での再生対応判定は利用できません。最高品質での視聴にはU-NEXTの対応端末が必要になる場合があります。',detail:'MediaCapabilities API が利用できません'};
+ if(!videos.length||!audios.length)return {note:'この環境での再生対応判定は確認できません。',detail:'音声または映像トラックが取得できません'};
+ const combinations=[];
+ for(const v of videos)for(const a of audios)combinations.push({v,a});
+ const results=[];
+ // Bound concurrent MediaCapabilities queries to avoid stressing the title page.
+ for(let i=0;i<combinations.length;i+=4){
+ const batch=await Promise.all(combinations.slice(i,i+4).map(async x=>{
+  try{const r=await navigator.mediaCapabilities.decodingInfo(makeCapabilitiesConfig(x.v,x.a));return {...x,state:r.supported?'yes':'no'}}
+  catch(e){return {...x,state:'unknown'}}
+ }));results.push(...batch);
+ }
+ const supported=results.filter(r=>r.state==='yes'),unknown=results.filter(r=>r.state==='unknown');
+ if(!supported.length)return {note:'この環境で再生可能な音声・映像の組み合わせを確認できませんでした。上記の最高品質で視聴するにはU-NEXTの対応端末が必要になる場合があります。',detail:'対応判定: 成功 '+supported.length+'件 / 未判定 '+unknown.length+'件'};
+ const bestVideo=supported.map(x=>x.v).sort((x,y)=>y.w*y.h-x.w*x.h||y.bitrate-x.bitrate)[0];
+ const bestAudio=supported.map(x=>x.a).sort((x,y)=>channelCount(y)-channelCount(x)||(/ec-3/i.test(y.c)?1:0)-(/ec-3/i.test(x.c)?1:0)||y.bitrate-x.bitrate)[0];
+ const videoBest=videos.slice().sort((a,b)=>b.w*b.h-a.w*a.h)[0];
+ const audioBest=audios.slice().sort((a,b)=>channelCount(b)-channelCount(a)||b.bitrate-a.bitrate)[0];
+ const videoLower=bestVideo.w*bestVideo.h<videoBest.w*videoBest.h;
+ const audioLower=/ec-3|ac-3/i.test(audioBest.c)?!/ec-3|ac-3/i.test(bestAudio.c)||channelCount(bestAudio)<channelCount(audioBest):channelCount(bestAudio)<channelCount(audioBest);
+ const blockedUnknown=unknown.some(x=>x.v.w*x.v.h>bestVideo.w*bestVideo.h||channelCount(x.a)>channelCount(bestAudio));
+ if(blockedUnknown)return {note:'この環境で確認できた再生対応形式は映像 '+videoLabel(bestVideo)+'・音声 '+audioLabel(bestAudio)+' です。より高品質な形式の対応状況は確認できませんでした。',detail:'対応判定: 成功 '+supported.length+'件 / 未判定 '+unknown.length+'件'};
+ const details='Widevine (SW_SECURE_CRYPTO / cenc) / 対応 '+supported.length+'件 / 非対応 '+results.filter(r=>r.state==='no').length+'件 / 未判定 '+unknown.length+'件';
+ if(videoLower||audioLower)return {note:'この環境では最大 '+videoLabel(bestVideo)+'・'+audioLabel(bestAudio)+' での再生が可能と判定されました。上記の最高品質で視聴するにはU-NEXTの対応端末で再生する必要があります。',detail:details};
+ if(atmos)return {note:'この環境では'+videoLabel(bestVideo)+'・'+audioLabel(bestAudio)+' の再生対応が確認できました。ただしDolby Atmosの再生可否はこの判定だけでは確認できません。',detail:details};
+ return {note:'この環境ではカードに表示した最高画質・音声形式の再生対応が確認できました（実際の再生品質を保証するものではありません）。',detail:details};
+}
 async function run(){const id=++runId;busy=true;render('照会中','確認中','音声情報を取得中','確認中','画質情報を取得中','配信情報を解析しています。','');
 const fail=e=>{if(id!==runId)return;busy=false;render('取得失敗','判定不能','音声情報を取得できませんでした','判定不能','画質情報を取得できませんでした',String(e.message||e),'エラー: '+String(e.message||e))};
 try{const injected=await chrome.runtime.sendMessage({type:'INJECT'});if(injected?.error)throw Error(injected.error);
@@ -64,9 +106,13 @@ const init=await checkInit(parsed,url);if(id!==runId)return;
 const aud=parsed.aud.sort((a,b)=>(b.channels||0)-(a.channels||0)||b.bitrate-a.bitrate),a=aud[0],best=parsed.vid.sort((a,b)=>b.w*b.h-a.w*a.h)[0];
 const atmos=parsed.mpdAtmos||init.atmos;const audioMain=atmos?'Dolby Atmos':a?channel(a):'不明',audioSub=a?codec(a.c):'音声情報なし';
 const videoMain=!best?'不明':best.h>=2160?'4K UHD':best.h>=1080?'Full HD':best.h>=720?'HD':best.h+'p',videoSub=best?best.w+'×'+best.h+' / '+codec(best.c):'映像情報なし';
-const note=(atmos?'Dolby Atmos':a?channel(a):'音声')+'での再生はU-NEXTの対応端末でのみ可能です。';
+const note='この環境での再生対応状況を確認中です。';
 const detail='作品: '+data.title+' / '+data.ep+'\nAtmos(MPD): '+(parsed.mpdAtmos?'検出':'未確認')+'\n'+init.details+'\n音声:\n'+aud.map(t=>codec(t.c)+' / '+channel(t)+' / '+t.bitrate+'bps / '+t.rate+'Hz').join('\n')+'\n映像:\n'+parsed.vid.map(t=>t.w+'×'+t.h+' / '+codec(t.c)+' / '+t.bitrate+'bps').join('\n')+'\n※MPDにある配信候補であり、実際の再生形式は端末によります。';
-render('解析完了',audioMain,audioSub,videoMain,videoSub,note,detail);busy=false;return;
+render('解析完了',audioMain,audioSub,videoMain,videoSub,note,detail);
+const capability=await checkPlaybackCapabilities(parsed.vid,parsed.aud,atmos);
+if(id!==runId)return;
+render('解析完了',audioMain,audioSub,videoMain,videoSub,capability.note,detail+'\\n再生対応判定: '+capability.detail);
+busy=false;return;
 }catch(e){last=e}}throw last||Error('MPD解析失敗')}
 catch(e){fail(e)}}
 function attach(){const target=anchor(),title=sid();if(!target||!title){document.getElementById(ID)?.remove();current='';return}
