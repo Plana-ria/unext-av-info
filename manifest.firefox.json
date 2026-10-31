@@ -1,0 +1,71 @@
+{
+  "manifest_version": 3,
+  "name": "U-NEXT AV Info (非公式)",
+  "version": "1.0.0",
+  "description": "U-NEXTの配信画質・音声形式や再生中の品質を確認できる非公式ブラウザ拡張機能",
+  "permissions": [
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://video.unext.jp/*",
+    "https://cc.unext.jp/*",
+    "https://playlist.unext.jp/*",
+    "https://*.unext.jp/*",
+    "https://*.nxtv.jp/*"
+  ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://video.unext.jp/play/*"
+      ],
+      "js": [
+        "playback-hook.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://video.unext.jp/*"
+      ],
+      "js": [
+        "probe.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://video.unext.jp/*"
+      ],
+      "js": [
+        "content.js",
+        "playback-ui.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "U-NEXT AV Info",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "unext-av-info@plana-ria"
+    }
+  }
+}
