@@ -70,26 +70,6 @@ for(const t of tracks.slice(0,8)){checked++;
 return {atmos:false,details:(list.join('\n')||'初期化情報なし')+(tracks.length>checked?'\n未検査のE-AC-3トラック: '+(tracks.length-checked):'')};
 }
 
-// Shared MPD inspection for the playback page. Does not infer the maximum from the active player track.
-window.__uaiAnalyzePlaylist=async function(mpds){
- if(!Array.isArray(mpds)||!mpds.length)throw Error('MPD URLがありません');
- const audio=[],video=[];let atmos=false,success=0;
- for(const url of mpds.slice(0,3)){
-  const response=await chrome.runtime.sendMessage({type:'FETCH',url});
-  if(response?.error)continue;
-  let parsed;try{parsed=mpdParse(response.text)}catch{continue}
-  if(!parsed.aud.length&&!parsed.vid.length)continue;
-  success++;audio.push(...parsed.aud);video.push(...parsed.vid);
-  if(parsed.mpdAtmos)atmos=true;
-  if(!atmos&&parsed.aud.some(x=>/ec-3/i.test(x.c))){
-   try{atmos=(await checkInit(parsed,url)).atmos}catch{}
-  }
- }
- if(!success)throw Error('MPD解析ができませんでした');
- video.sort((a,b)=>b.w*b.h-a.w*a.h||b.bitrate-a.bitrate);
- audio.sort((a,b)=>channelCount(b)-channelCount(a)||(/ec-3/i.test(b.c)?1:0)-(/ec-3/i.test(a.c)?1:0)||b.bitrate-a.bitrate);
- return {video:video[0]?videoLabel(video[0])+' / '+codec(video[0].c):'未確認',audio:atmos?'Dolby Atmos':audio[0]?audioLabel(audio[0]):'未確認',success};
-};
 function fpsNumber(s){if(!s)return 24;const [n,d]=String(s).split('/').map(Number);return Number.isFinite(n)&&n>0&&(!d||d>0)?n/(d||1):24}
 function channelCount(a){return Number(a.channels)||(/F801/i.test(a.config)&&/ec-3|ac-3/i.test(a.c)?6:0)}
 function audioLabel(a){return codec(a.c)+' ('+channel(a)+')'}
