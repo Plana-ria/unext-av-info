@@ -1,5 +1,6 @@
 // A single toolbar toggle is shared by all U-NEXT tabs and persisted across restarts.
-let enabled=true;
+let enabled=false;
+const activeFetches=new Set();
 const initialized=chrome.storage.local.get('enabled').then(state=>{
  enabled=state.enabled!==false;
  updateBadge();
@@ -12,6 +13,7 @@ function updateBadge(){
 chrome.action.onClicked.addListener(async()=>{
  await initialized;
  enabled=!enabled;
+ if(!enabled){for(const controller of activeFetches)controller.abort();activeFetches.clear()}
  await chrome.storage.local.set({enabled});
  updateBadge();
  const tabs=await chrome.tabs.query({url:'https://video.unext.jp/*'});
@@ -20,17 +22,28 @@ chrome.action.onClicked.addListener(async()=>{
 chrome.runtime.onMessage.addListener((m,s,send)=>{
  if(m?.type==='UAI_GET_ENABLED'){initialized.then(()=>send({enabled}));return true;}
  if(!s.tab?.url?.startsWith('https://video.unext.jp/'))return;
- if(!enabled){send({error:'拡張機能はOFFです'});return false;}
+ // Initialization is asynchronous after a service-worker restart.
+ // Wait for persisted state before allowing any extension-originated request.
+ if(m?.type==='FETCH'||m?.type==='INJECT'||m?.type==='PLAYBACK_HOOK'){
+  initialized.then(()=>{
+   if(!enabled){send({error:'拡張機能はOFFです'});return}
+   handleEnabledMessage(m,s,send);
+  }).catch(error=>send({error:String(error)}));
+  return true;
+ }
+});
+function handleEnabledMessage(m,s,send){
  if(m?.type==='PLAYBACK_HOOK'){chrome.scripting.executeScript({target:{tabId:s.tab.id},world:'MAIN',files:['playback-hook.js']}).then(()=>send({ok:true})).catch(e=>send({error:String(e.message||e)}));return true;}
  if(m?.type==='INJECT'){send({ok:true});return false;}
  if(m?.type==='FETCH'){
   (async()=>{
+   const controller=new AbortController();activeFetches.add(controller);
    try{
     const u=new URL(m.url);
     if(u.protocol!=='https:'|| !(/(^|\.)(unext\.jp|nxtv\.jp)$/.test(u.hostname)))throw Error('取得先ホストが許可されていません');
     const init=m.range&&/^bytes=\d+-\d+$/.test(m.range);
     const headers=init?{Range:m.range}:{};
-    const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),12000);
+    const timeout=setTimeout(()=>controller.abort(),12000);
     let r;try{r=await fetch(u.href,{credentials:'omit',cache:'no-store',headers,redirect:'error',signal:controller.signal});}catch(e){clearTimeout(timeout);throw e}
     if(!r.ok){clearTimeout(timeout);throw Error('HTTP '+r.status)}
     const limit=init?524288:3000000;
@@ -44,7 +57,7 @@ chrome.runtime.onMessage.addListener((m,s,send)=>{
       if(r.status!==206&&Number(m.range.slice(6).split('-')[0])>0)throw Error('Range応答がありません');
       const a=bytes;let str='';for(let i=0;i<a.length;i+=8192)str+=String.fromCharCode(...a.subarray(i,i+8192));send({base64:btoa(str)});
     }else{send({text:new TextDecoder().decode(bytes)});}
-   }catch(e){send({error:e.message});}
+   }catch(e){send({error:e.message});}finally{activeFetches.delete(controller)}
   })();return true;
  }
-});
+}
