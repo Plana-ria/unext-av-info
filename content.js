@@ -9,8 +9,8 @@ function card(){const host=document.createElement('section');host.id=ID;const sh
 <div class="panel"><header><h2>音声・映像の配信情報</h2><span id="state" class="state">準備中</span></header><div class="grid">
 <div class="metric"><div class="label">音声</div><div class="primary" id="a">解析待ち</div><div class="sub" id="as">—</div></div>
 <div class="metric"><div class="label">画質</div><div class="primary" id="v">解析待ち</div><div class="sub" id="vs">—</div></div></div>
-<div class="note" id="note"></div><div id="actions" hidden><button id="retry">再取得</button></div>
-<details><summary>取得した詳細と注意事項</summary><pre id="detail"></pre><div class="official-links"><div>U-NEXT公式の対応条件</div><a class="help-link" href="https://help.unext.jp/guide/detail/what-is-dolby-audio-and-dolby-atmos" target="_blank" rel="noopener noreferrer">Dolby音声の対応条件（U-NEXT公式） ↗</a><a class="help-link" href="https://help.unext.jp/guide/detail/what-is-4k" target="_blank" rel="noopener noreferrer">4K画質の対応条件（U-NEXT公式） ↗</a></div></details></div>`;sh.getElementById('retry').onclick=run;return host}
+<div class="note" id="note"></div><div class="official-links"><div>U-NEXT公式の対応条件</div><a class="help-link" href="https://help.unext.jp/guide/detail/what-is-dolby-audio-and-dolby-atmos" target="_blank" rel="noopener noreferrer">Dolby音声の対応条件（U-NEXT公式） ↗</a><a class="help-link" href="https://help.unext.jp/guide/detail/what-is-4k" target="_blank" rel="noopener noreferrer">4K画質の対応条件（U-NEXT公式） ↗</a></div><div id="actions" hidden><button id="retry">再取得</button></div>
+<details><summary>取得した詳細と注意事項</summary><pre id="detail"></pre></details></div>`;sh.getElementById('retry').onclick=run;return host}
 function channel(t){const c=String(t.config||'').toUpperCase();if(c==='F801')return '5.1ch';if(t.channels===1)return '1.0ch';if(t.channels===2)return '2.0ch';return t.channels?t.channels+'ch（構成未確認）':'構成不明'}
 function codec(s){if(/ec-3/i.test(s))return 'Dolby Digital Plus';if(/ac-3/i.test(s))return 'Dolby Digital';if(/mp4a/i.test(s))return 'AAC';if(/hvc1|hev1/i.test(s))return 'HEVC';if(/avc1/i.test(s))return 'H.264';return s||'不明'}
 function attrs(e,n){return e.getAttribute(n)}
