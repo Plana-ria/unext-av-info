@@ -35,7 +35,7 @@ function highestQuality(){
 function draw(){
  const v=video(),w=v?.videoWidth||last?.video?.width||last?.track?.width||last?.stats?.width,h=v?.videoHeight||last?.video?.height||last?.track?.height;
  const identified=last?.track?.audioCodec?trackAudio(last.track):null;
- const text='現在：映像 '+q(w,h)+' · 音声 '+(identified||(mseAudio()||'取得不可'))+'\n最高：'+highestQuality();
+ const text='現在：映像 '+q(w,h)+' · 音声 '+(identified||(mseAudio()||'取得不可'))+'\n候補最高：'+highestQuality();
  for(const el of document.querySelectorAll('.'+CLS))el.textContent=text;
 }
 async function reinject(){if(!enabled)return;try{await chrome.runtime.sendMessage({type:'PLAYBACK_HOOK'})}catch{}}
