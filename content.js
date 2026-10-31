@@ -1,5 +1,5 @@
 (()=>{if(window.__unextAvInfoActive)return;window.__unextAvInfoActive=true;
-const ID='unext-av-info-card';let current='',busy=false,runId=0,lastUrl=location.href,resourceSince=performance.now();
+const ID='unext-av-info-card';let enabled=false;let current='',busy=false,runId=0,lastUrl=location.href,resourceSince=performance.now();
 function sid(){const m=location.pathname.match(/SID\d+/);if(m)return m[0];if(observedTitle)return observedTitle;const a=performance.getEntriesByType('resource').filter(e=>e.startTime>=resourceSince);for(let i=a.length-1;i>=0;i--){try{const u=new URL(a[i].name);if(u.hostname!=='cc.unext.jp'||!['cosmo_getVideoTitle','cosmo_getVideoTitleEpisodes','cosmo_getVideoTitleRelatedStuffs'].includes(u.searchParams.get('operationName')))continue;const id=JSON.parse(u.searchParams.get('variables')||'{}').code;if(/^SID\d+$/.test(id))return id}catch{}}return null}
 function anchor(){return [...document.querySelectorAll('h2')].find(h=>h.textContent.trim()==='キャスト・スタッフ')?.parentElement}
 let observedTitle=null;
@@ -145,7 +145,7 @@ function requestTitleData(id,title,attempt){
   window.addEventListener('message',handler);window.postMessage({source:'UAI_QUERY',id:requestId,title},location.origin);
  });
 }
-async function run(title=sid()){if(!title)return;const id=++runId,requestUrl=location.href;const valid=()=>id===runId&&location.href===requestUrl&&sid()===title;busy=true;const links=rootOf()?.getElementById('official-links');if(links)links.hidden=true;render('照会中','確認中','音声情報を取得中','確認中','画質情報を取得中','配信情報を解析しています。','');
+async function run(title=sid()){if(!enabled||!title)return;const id=++runId,requestUrl=location.href;const valid=()=>enabled&&id===runId&&location.href===requestUrl&&sid()===title;busy=true;const links=rootOf()?.getElementById('official-links');if(links)links.hidden=true;render('照会中','確認中','音声情報を取得中','確認中','画質情報を取得中','配信情報を解析しています。','');
 const fail=e=>{if(!valid())return;busy=false;const info=describeError(e);render('取得失敗','判定不能','音声情報を取得できませんでした','判定不能','画質情報を取得できませんでした',info.message,'エラー種別: '+info.kind+'\n'+info.detail)};
 try{const injected=await chrome.runtime.sendMessage({type:'INJECT'});if(injected?.error)throw Error(injected.error);
 let data;
@@ -202,6 +202,7 @@ busy=false;
 }
 catch(e){fail(e)}}
 function attach(){
+ if(!enabled)return;
  const target=anchor();
  if(!target){if(current)invalidate();document.getElementById(ID)?.remove();return}
  let host=document.getElementById(ID);const fresh=!host;if(!host)host=card();
@@ -214,7 +215,10 @@ function attach(){
  const key=title+'|'+location.pathname;
  if(key!==current||fresh){if(current&&current!==key)invalidate();current=key;run(title)}
 }
-let pending=false;function schedule(){if(pending)return;pending=true;setTimeout(()=>{pending=false;attach()},300)}
+function setEnabled(next){const was=enabled;enabled=next;if(!enabled){invalidate();document.getElementById(ID)?.remove()}else if(!was){observedTitle=null;resourceSince=0;window.postMessage({source:'UAI_GET_TITLE'},location.origin);schedule()}}
+chrome.runtime.onMessage.addListener(m=>{if(m?.type==='UAI_ENABLED_CHANGED')setEnabled(m.enabled!==false)});
+chrome.runtime.sendMessage({type:'UAI_GET_ENABLED'}).then(r=>setEnabled(r?.enabled!==false)).catch(()=>{});
+let pending=false;function schedule(){if(!enabled||pending)return;pending=true;setTimeout(()=>{pending=false;attach()},300)}
 new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true});
-setInterval(()=>{if(lastUrl!==location.href){lastUrl=location.href;resourceSince=performance.now();observedTitle=null;invalidate();window.postMessage({source:'UAI_GET_TITLE',fresh:true},location.origin);schedule()}else if(anchor()&&(!sid()||!document.getElementById(ID)))schedule()},700);
+setInterval(()=>{if(!enabled)return;if(lastUrl!==location.href){lastUrl=location.href;resourceSince=performance.now();observedTitle=null;invalidate();window.postMessage({source:'UAI_GET_TITLE',fresh:true},location.origin);schedule()}else if(anchor()&&(!sid()||!document.getElementById(ID)))schedule()},700);
 schedule()})();
