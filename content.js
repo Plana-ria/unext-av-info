@@ -2,6 +2,12 @@
 const ID='unext-av-info-card';let current='',busy=false,runId=0,lastUrl=location.href;
 function sid(){const m=location.pathname.match(/SID\d+/);if(m)return m[0];const a=performance.getEntriesByType('resource');for(let i=a.length-1;i>=0;i--){try{const u=new URL(a[i].name);if(u.hostname!=='cc.unext.jp'||!['cosmo_getVideoTitle','cosmo_getVideoTitleEpisodes','cosmo_getVideoTitleRelatedStuffs'].includes(u.searchParams.get('operationName')))continue;const id=JSON.parse(u.searchParams.get('variables')||'{}').code;if(/^SID\d+$/.test(id))return id}catch{}}return null}
 function anchor(){return [...document.querySelectorAll('h2')].find(h=>h.textContent.trim()==='キャスト・スタッフ')?.parentElement}
+let observedTitle=null;
+window.addEventListener('message',e=>{
+ if(e.source!==window||e.data?.source!=='UAI_TITLE_FOUND'||!/^SID\\d+$/.test(e.data.title||''))return;
+ if(observedTitle!==e.data.title){observedTitle=e.data.title;current='';schedule()}
+});
+window.postMessage({source:'UAI_GET_TITLE'},location.origin);
 const rootOf=()=>document.getElementById(ID)?.shadowRoot;
 function render(state,a,as,v,vs,note,detail){const sh=rootOf();if(!sh)return;for(const [k,value] of Object.entries({state,a,as,v,vs,note,detail}))sh.getElementById(k).textContent=value??'';sh.getElementById('note').hidden=!note;sh.getElementById('actions').hidden=state!=='取得失敗'}
 function card(){const host=document.createElement('section');host.id=ID;const sh=host.attachShadow({mode:'open'});sh.innerHTML=`<style>
