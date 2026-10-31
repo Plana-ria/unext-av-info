@@ -34,10 +34,10 @@ let ac=r.querySelector('AudioChannelConfiguration')||set.querySelector('AudioCha
 aud.push({c,channels,config:conf,bitrate:+base||0,rate:attrs(r,'audioSamplingRate')||attrs(set,'audioSamplingRate')||'',representation:r,adaptation:set})}}
 const mpdAtmos=[...d.querySelectorAll('SupplementalProperty,EssentialProperty')].some(p=>/EC3_ExtensionType/i.test(p.getAttribute('schemeIdUri')||'')&&/JOC/i.test(p.getAttribute('value')||'')&&!!aud.find(a=>/ec-3/i.test(a.c)));return{aud,vid,mpdAtmos,d}}
 function parseDec3(bytes){for(let i=0;i+12<bytes.length;i++){if(bytes[i+4]!==100||bytes[i+5]!==101||bytes[i+6]!==99||bytes[i+7]!==51)continue;const n=(bytes[i]*16777216+bytes[i+1]*65536+bytes[i+2]*256+bytes[i+3])>>>0;if(n<10||i+n>bytes.length)continue;const p=bytes.slice(i+8,i+n);const hex=[...p].map(v=>v.toString(16).padStart(2,'0')).join(' ');return {hex,atmos:p.length>=7&&p[p.length-2]===1&&p[p.length-1]>0,bytes:p.length}}return null}
-async function checkInit(parsed,mpdUrl){
+async function checkInit(parsed,mpdUrl,initCache=new Map()){
 const direct=(n,name)=>[...n?.children||[]].find(x=>x.localName===name);
 const list=[];
-const tracks=parsed.aud.filter(t=>/ec-3/i.test(t.c));let checked=0;
+const tracks=parsed.aud.filter(t=>/ec-3/i.test(t.c)).sort((a,b)=>b.bitrate-a.bitrate);let checked=0;
 for(const t of tracks.slice(0,8)){checked++;
  try{
   const r=t.representation,adapt=t.adaptation;
@@ -59,10 +59,16 @@ for(const t of tracks.slice(0,8)){checked++;
     if(raw&&/^\d+-\d+$/.test(raw)){let [x,y]=raw.split('-').map(Number);range='bytes='+x+'-'+Math.min(y,x+262143);}
   }
   const url=new URL(rel||'',base);
-  const response=await chrome.runtime.sendMessage({type:'FETCH',url:url.href,range});
-  if(response?.error)throw Error(response.error);
-  const bin=atob(response.base64||''),bytes=Uint8Array.from(bin,x=>x.charCodeAt(0));
-  const box=parseDec3(bytes);
+  const cacheKey=url.href+'|'+range;
+  let box;
+  if(initCache.has(cacheKey)){box=initCache.get(cacheKey)}
+  else{
+   const response=await chrome.runtime.sendMessage({type:'FETCH',url:url.href,range});
+   if(response?.error)throw Error(response.error);
+   const bin=atob(response.base64||''),bytes=Uint8Array.from(bin,x=>x.charCodeAt(0));
+   box=parseDec3(bytes);
+   initCache.set(cacheKey,box);
+  }
   list.push(box?'dec3: '+box.hex+(box.atmos?' / Atmos拡張フラグあり':' / Atmos識別未確認'):'dec3未検出');
   if(box?.atmos)return {atmos:true,details:list.join('\n')};
  }catch(e){list.push('初期化セグメント: '+String(e.message||e).slice(0,160));}
@@ -73,7 +79,7 @@ return {atmos:false,details:(list.join('\n')||'初期化情報なし')+(tracks.l
 // Shared MPD inspection for the playback page. Does not infer the maximum from the active player track.
 window.__uaiAnalyzePlaylist=async function(mpds,isCurrent=()=>true){
  if(!Array.isArray(mpds)||!mpds.length)throw Error('MPD URLがありません');
- const audio=[],video=[];let atmos=false,success=0;
+ const audio=[],video=[],initCache=new Map();let atmos=false,success=0;
  for(const url of mpds.slice(0,3)){
   if(!isCurrent())throw Error('解析が中断されました');
   const response=await chrome.runtime.sendMessage({type:'FETCH',url});
@@ -84,7 +90,7 @@ window.__uaiAnalyzePlaylist=async function(mpds,isCurrent=()=>true){
   success++;audio.push(...parsed.aud);video.push(...parsed.vid);
   if(parsed.mpdAtmos)atmos=true;
   if(!atmos&&parsed.aud.some(x=>/ec-3/i.test(x.c))){
-   try{atmos=(await checkInit(parsed,url)).atmos}catch{}
+   try{atmos=(await checkInit(parsed,url,initCache)).atmos}catch{}
    if(!isCurrent())throw Error('解析が中断されました');
   }
  }
@@ -186,7 +192,7 @@ if(!valid())return;
 if(data.title&&data.title!==title)throw Error('作品IDが一致しません');
 if(data.error)throw Error(data.error);
 if(!data.mpds?.length)throw Error('MPD URLを取得できませんでした');
-const groups=[],failures=[];
+const groups=[],failures=[],initCache=new Map();
 for(const url of data.mpds){
  if(!valid())return;
  try{
@@ -195,7 +201,7 @@ for(const url of data.mpds){
   if(response?.error)throw Error(response.error);
   const parsed=mpdParse(response.text);
   if(!parsed.aud.length&&!parsed.vid.length)throw Error('MPDに映像・音声情報がありません');
-  const init=await checkInit(parsed,url);
+  const init=parsed.mpdAtmos?{atmos:true,details:'MPDにDolby Atmos (JOC) 情報あり'}:await checkInit(parsed,url,initCache);
   if(!valid())return;
   groups.push({parsed,init});
  }catch(error){failures.push(describeError(error).detail)}
