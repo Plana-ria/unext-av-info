@@ -1,5 +1,26 @@
+// A single toolbar toggle is shared by all U-NEXT tabs and persisted across restarts.
+let enabled=true;
+const initialized=chrome.storage.local.get('enabled').then(state=>{
+ enabled=state.enabled!==false;
+ updateBadge();
+}).catch(()=>updateBadge());
+function updateBadge(){
+ chrome.action.setBadgeText({text:enabled?'':'OFF'});
+ chrome.action.setBadgeBackgroundColor({color:'#666666'});
+ chrome.action.setTitle({title:'U-NEXT AV Info：'+(enabled?'ON（クリックでOFF）':'OFF（クリックでON）')});
+}
+chrome.action.onClicked.addListener(async()=>{
+ await initialized;
+ enabled=!enabled;
+ await chrome.storage.local.set({enabled});
+ updateBadge();
+ const tabs=await chrome.tabs.query({url:'https://video.unext.jp/*'});
+ for(const tab of tabs)if(tab.id!=null)chrome.tabs.sendMessage(tab.id,{type:'UAI_ENABLED_CHANGED',enabled}).catch(()=>{});
+});
 chrome.runtime.onMessage.addListener((m,s,send)=>{
+ if(m?.type==='UAI_GET_ENABLED'){initialized.then(()=>send({enabled}));return true;}
  if(!s.tab?.url?.startsWith('https://video.unext.jp/'))return;
+ if(!enabled){send({error:'拡張機能はOFFです'});return false;}
  if(m?.type==='PLAYBACK_HOOK'){chrome.scripting.executeScript({target:{tabId:s.tab.id},world:'MAIN',files:['playback-hook.js']}).then(()=>send({ok:true})).catch(e=>send({error:String(e.message||e)}));return true;}
  if(m?.type==='INJECT'){send({ok:true});return false;}
  if(m?.type==='FETCH'){
