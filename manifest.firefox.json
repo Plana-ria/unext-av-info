@@ -68,5 +68,9 @@
     "gecko": {
       "id": "unext-av-info@plana-ria"
     }
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
   }
 }
