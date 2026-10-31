@@ -21,20 +21,27 @@ function parseManifest(xml){
   if(video.length||audio.length)observedManifest={video,audio};
  }catch{}
 }
-function inspectManifestUrl(url){try{return /\.mpd(?:[?#]|$)/i.test(new URL(url,location.href).href)}catch{return false}}
+function inspectManifestUrl(url){try{return /\.mpd(?:[?#]|$)/i.test(new URL(url,location.href).pathname)}catch{return false}}
+function looksLikeManifest(contentType){return /dash\+xml|mpegurl|application\/xml/i.test(contentType||'')}
+function readPlayerManifest(p){
+ try{
+  const m=p?.getManifest?.();if(!m?.variants?.length)return null;
+  return {video:m.variants.flatMap(v=>v.video?[{width:v.video.width||0,height:v.video.height||0,codec:v.video.codecs||''}]:[]),audio:m.variants.flatMap(v=>v.audio?[{codec:v.audio.codecs||'',channels:Number(v.audio.channelsCount)||0}]:[])};
+ }catch{return null}
+}
 const nativeFetch=window.fetch;
 if(typeof nativeFetch==='function'){
  window.fetch=function(...args){
   const result=nativeFetch.apply(this,args);
-  try{const url=typeof args[0]==='string'?args[0]:args[0]?.url;if(inspectManifestUrl(url))result.then(r=>{if(r.ok)r.clone().text().then(parseManifest).catch(()=>{})}).catch(()=>{})}catch{}
+  try{const url=typeof args[0]==='string'?args[0]:args[0]?.url;result.then(r=>{if(r.ok&&(inspectManifestUrl(url)||looksLikeManifest(r.headers.get('content-type'))))r.clone().text().then(parseManifest).catch(()=>{})}).catch(()=>{})}catch{}
   return result;
  };
 }
 const xhrOpen=XMLHttpRequest.prototype.open,xhrSend=XMLHttpRequest.prototype.send;
 XMLHttpRequest.prototype.open=function(method,url){this.__uaiManifestUrl=inspectManifestUrl(url);return xhrOpen.apply(this,arguments)};
 XMLHttpRequest.prototype.send=function(){
- if(this.__uaiManifestUrl)this.addEventListener('load',()=>{
-  try{if(this.status>=200&&this.status<300){
+ this.addEventListener('load',()=>{
+  try{if(this.status>=200&&this.status<300&&(this.__uaiManifestUrl||looksLikeManifest(this.getResponseHeader('content-type')))){
    if(this.responseType==='arraybuffer'&&this.response instanceof ArrayBuffer)parseManifest(new TextDecoder().decode(this.response));
    else if(!this.responseType||this.responseType==='text')parseManifest(this.responseText);
   }}catch{}
@@ -93,7 +100,7 @@ window.addEventListener('message',e=>{
   video:v?{width:v.videoWidth,height:v.videoHeight,readyState:v.readyState}:null,
   track:track?{width:track.width,height:track.height,audioCodec:track.audioCodec,channelsCount:track.channelsCount}:null,
   stats:stats?{width:stats.width,height:stats.height}:null,
-  manifest:observedManifest,
+  manifest:readPlayerManifest(player)||observedManifest,
   variants:variants.map(x=>({width:x.width,height:x.height,audioCodec:x.audioCodec,videoCodec:x.videoCodec,channelsCount:x.channelsCount,bandwidth:x.bandwidth,allowedByApplication:x.allowedByApplication,allowedByKeySystem:x.allowedByKeySystem})),
   mse:{hooked:mse.hooked,sourceBuffers:mse.sourceBuffers.map(x=>({...x})),appendCount:mse.appendCount}
  }},location.origin);
