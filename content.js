@@ -4,7 +4,7 @@ function sid(){const m=location.pathname.match(/SID\d+/);if(m)return m[0];const 
 function anchor(){return [...document.querySelectorAll('h2')].find(h=>h.textContent.trim()==='キャスト・スタッフ')?.parentElement}
 let observedTitle=null;
 window.addEventListener('message',e=>{
- if(e.source!==window||e.data?.source!=='UAI_TITLE_FOUND'||!/^SID\\d+$/.test(e.data.title||''))return;
+ if(e.source!==window||e.data?.source!=='UAI_TITLE_FOUND'||!/^SID\d+$/.test(e.data.title||''))return;
  if(observedTitle!==e.data.title){observedTitle=e.data.title;current='';schedule()}
 });
 window.postMessage({source:'UAI_GET_TITLE'},location.origin);
