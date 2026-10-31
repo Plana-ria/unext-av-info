@@ -128,6 +128,8 @@ function describeError(error){
  const detail=raw.replace(/https?:\/\/[^\s]+/g,'[URL省略]').replace(/(?:play_token|token|zxuid|zxemp)=[^\s&]+/gi,'$1=[省略]');
  if(/cosmo_getPlaylistUrl.*(?:HTTP 40[13]|forbidden|unauthori[sz]ed|access.denied|permission)/i.test(raw))
   return {kind:'PLAYLIST_ACCESS',message:'この作品の配信情報を取得できません。（未購入のポイント作品の可能性があります）',detail,retry:false};
+ if(/(?:MPD URLを取得できませんでした|プレイリスト情報がありません)/i.test(raw))
+  return {kind:'PLAYLIST_UNAVAILABLE',message:'この作品の配信情報を取得できません。（未購入のポイント作品の可能性があります）',detail,retry:false};
  if(/(?:API応答タイムアウト|timed?\s*out)/i.test(raw))return {kind:'TIMEOUT',message:'応答がありません。再取得してください。',detail,retry:true};
  if(/(?:HTTP (?:429|5\d\d))\b/i.test(raw))return {kind:'SERVER',message:'一時的に配信情報を取得できませんでした。再取得してください。',detail,retry:true};
  if(/(?:Failed to fetch|NetworkError|network error|ネットワーク|通信エラー)/i.test(raw))return {kind:'NETWORK',message:'通信に失敗しました。接続を確認してください。',detail,retry:true};
