@@ -10,7 +10,7 @@ function mount(){
  for(const btn of document.querySelectorAll('[data-testid="player-setting-show"]')){
   const parent=btn.parentElement;if(!parent||parent.nextElementSibling?.classList.contains(CLS))continue;
   const el=document.createElement('span');el.className=CLS;
-  el.style.cssText='display:inline-flex;align-items:center;justify-content:center;margin:0 8px 0 10px;padding:5px 10px;border:1px solid rgba(255,255,255,.3);border-radius:7px;background:rgba(4,13,29,.65);color:white;font-size:12px;line-height:1.35;white-space:nowrap;pointer-events:none';
+  el.style.cssText='display:inline-flex;align-items:center;justify-content:center;margin:0 8px 0 10px;padding:5px 10px;border:1px solid rgba(255,255,255,.3);border-radius:7px;background:rgba(4,13,29,.65);color:white;font-size:12px;line-height:1.35;white-space:pre-line;pointer-events:none';
   parent.after(el);
  }
  draw();
@@ -24,10 +24,18 @@ function mseAudio(){
  ||entries.find(x=>/^(ec-3|enca)$/.test(x.type)&&/ec-3/i.test(t)&&Number.isInteger(x.channels)&&x.channels>0)?.channels;
  return audio(t,ch);
 }
+function highestQuality(){
+ const variants=(last?.variants||[]).filter(x=>x.allowedByApplication!==false&&x.allowedByKeySystem!==false);
+ if(!variants.length)return '映像 取得不可 · 音声 取得不可';
+ const videoBest=variants.filter(x=>x.width>0&&x.height>0).sort((a,b)=>(b.width*b.height)-(a.width*a.height))[0];
+ const audioRank=x=>/ec-3/i.test(x.audioCodec||'')?3:/ac-3/i.test(x.audioCodec||'')?2:/mp4a/i.test(x.audioCodec||'')?1:0;
+ const audioBest=variants.filter(x=>x.audioCodec).sort((a,b)=>audioRank(b)-audioRank(a)||(Number(b.channelsCount)||0)-(Number(a.channelsCount)||0)||(b.bandwidth||0)-(a.bandwidth||0))[0];
+ return '映像 '+(videoBest?q(videoBest.width,videoBest.height):'取得不可')+' · 音声 '+(audioBest?trackAudio(audioBest):'取得不可');
+}
 function draw(){
  const v=video(),w=v?.videoWidth||last?.video?.width||last?.track?.width||last?.stats?.width,h=v?.videoHeight||last?.video?.height||last?.track?.height;
  const identified=last?.track?.audioCodec?trackAudio(last.track):null;
- const text='映像 '+q(w,h)+' · 音声 '+(identified||(mseAudio()||'取得不可'));
+ const text='現在：映像 '+q(w,h)+' · 音声 '+(identified||(mseAudio()||'取得不可'))+'\n最高：'+highestQuality();
  for(const el of document.querySelectorAll('.'+CLS))el.textContent=text;
 }
 async function reinject(){if(!enabled)return;try{await chrome.runtime.sendMessage({type:'PLAYBACK_HOOK'})}catch{}}
