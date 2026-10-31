@@ -1,7 +1,7 @@
 (()=>{if(window.__uaiPlaybackUi)return;window.__uaiPlaybackUi=true;
 const CLS='uai-playback-info';let enabled=false,playlistHighest=null,playlistBusy=false,playlistKey='',playlistRetryAt=0;let serial=0,waiting=false,last=null,lastReply=0,lastPath='';
 function q(w,h){return !w||!h?'取得不可':h>=2160?'4K':h>=1080?'1080p':h>=720?'720p':h+'p'}
-function audio(t,ch){const name=/ec-3/i.test(t)?'Dolby Digital Plus':/ac-3/i.test(t)?'Dolby Digital':/mp4a/i.test(t)?'AAC':'音声形式不明';return name+' ('+(ch===2?'2.0ch':ch===1?'1.0ch':ch===6?'6ch・配置未確認':ch?ch+'ch・配置未確認':'ch未確認')+')'}
+function audio(t,ch){const name=/ec-3/i.test(t)?'Dolby Digital Plus':/ac-3/i.test(t)?'Dolby Digital':/mp4a/i.test(t)?'AAC':'音声形式不明';return name+' ('+(ch===2?'2.0ch':ch===1?'1.0ch':ch===6?'5.1ch':ch?ch+'ch・配置未確認':'ch未確認')+')'}
 function trackAudio(t){if(!t?.audioCodec)return '取得不可';return audio(t.audioCodec,t.channelsCount)}
 function video(){return [...document.querySelectorAll('video')].find(v=>v.videoWidth&&v.videoHeight)||document.querySelector('video')}
 function mount(){
@@ -43,7 +43,7 @@ function parsePlaylistMPD(xml){
    }
   }
  }
- const atmos=[...doc.querySelectorAll('SupplementalProperty,EssentialProperty')].some(x=>/EC3_ExtensionType/i.test(x.getAttribute('schemeIdUri')||'')&&/JOC/i.test(x.getAttribute('value')||''));
+ const atmos=audios.some(a=>/ec-3/i.test(a.codec))&&[...doc.querySelectorAll('SupplementalProperty,EssentialProperty')].some(x=>/EC3_ExtensionType/i.test(x.getAttribute('schemeIdUri')||'')&&/JOC/i.test(x.getAttribute('value')||''));
  return {videos,audios,atmos};
 }
 async function loadPlaylistHighest(){
@@ -74,7 +74,7 @@ async function loadPlaylistHighest(){
   const rank=c=>/ec-3/i.test(c||'')?3:/ac-3/i.test(c||'')?2:/mp4a/i.test(c||'')?1:0;
   const audios=parsed.flatMap(x=>x.audios).sort((a,b)=>(b.channels||0)-(a.channels||0)||rank(b.codec)-rank(a.codec));
   const v=videos[0],a=audios[0],atmos=parsed.some(x=>x.atmos);
-  if(enabled&&location.href===key){playlistHighest='映像 '+(v?q(v.width,v.height):'未確認')+' · 音声 '+(atmos?'Dolby Atmos':a?audio(a.codec,a.channels):'未確認');draw()}
+  if(enabled&&location.href===key){playlistHighest='映像 '+(v?q(v.width,v.height):'未確認')+' · 音声 '+(atmos?'Dolby Atmos ('+(a?.channels===6?'5.1ch':a?.channels===2?'2.0ch':a?.channels===1?'1.0ch':a?.channels?a.channels+'ch・配置未確認':'構成不明')+')':a?audio(a.codec,a.channels):'未確認');draw()}
  }catch(e){
   if(enabled&&location.href===key){playlistHighest='映像 取得不可 · 音声 取得不可';playlistRetryAt=Date.now()+15000;draw()}
  }finally{playlistBusy=false}
@@ -83,7 +83,7 @@ async function loadPlaylistHighest(){
 function draw(){
  const v=video(),w=v?.videoWidth||last?.video?.width||last?.track?.width||last?.stats?.width,h=v?.videoHeight||last?.video?.height||last?.track?.height;
  const identified=last?.track?.audioCodec?trackAudio(last.track):null;
- const text='現在：映像 '+q(w,h)+' · 音声 '+(identified||(mseAudio()||'取得不可'))+'\nMPD内最高：'+highestQuality();
+ const text='現在：映像 '+q(w,h)+' · 音声 '+(identified||(mseAudio()||'取得不可'))+'\n最高品質：'+highestQuality();
  for(const el of document.querySelectorAll('.'+CLS))el.textContent=text;
 }
 async function reinject(){if(!enabled)return;try{await chrome.runtime.sendMessage({type:'PLAYBACK_HOOK'})}catch{}}
