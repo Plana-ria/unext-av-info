@@ -28,24 +28,6 @@ function highestQuality(){
  if(!playlistHighest)return '映像 確認中 · 音声 確認中';
  return playlistHighest;
 }
-function parsePlaylistMPD(xml){
- const doc=new DOMParser().parseFromString(xml,'application/xml');if(doc.querySelector('parsererror'))throw Error('MPD XML不正');
- const videos=[],audios=[];
- for(const set of doc.querySelectorAll('AdaptationSet')){
-  for(const rep of [...set.children].filter(x=>x.localName==='Representation')){
-   const c=rep.getAttribute('codecs')||set.getAttribute('codecs')||'',mime=rep.getAttribute('mimeType')||set.getAttribute('mimeType')||'';
-   const width=Number(rep.getAttribute('width')||set.getAttribute('width'))||0,height=Number(rep.getAttribute('height')||set.getAttribute('height'))||0;
-   if(width&&height&&!/audio/i.test(mime)){videos.push({width,height});continue}
-   if(/audio/i.test(mime)||/^(ec-3|ac-3|mp4a)/i.test(c)){
-    const ac=rep.querySelector('AudioChannelConfiguration')||set.querySelector('AudioChannelConfiguration'),config=ac?.getAttribute('value')||'';
-    const ch=/^F801$/i.test(config)&&/ec-3|ac-3/i.test(c)?6:/^\d+$/.test(config)?Number(config):0;
-    audios.push({codec:c,channels:ch});
-   }
-  }
- }
- const atmos=[...doc.querySelectorAll('SupplementalProperty,EssentialProperty')].some(x=>/EC3_ExtensionType/i.test(x.getAttribute('schemeIdUri')||'')&&/JOC/i.test(x.getAttribute('value')||''));
- return {videos,audios,atmos};
-}
 async function loadPlaylistHighest(){
  if(!enabled||!location.pathname.startsWith('/play/')||playlistBusy||Date.now()<playlistRetryAt)return;
  const key=location.href;if(playlistKey===key&&playlistHighest)return;
@@ -60,21 +42,11 @@ async function loadPlaylistHighest(){
   const result=await replyData();
   if(result?.error)throw Error(result.error);
   if(!result?.mpds?.length)throw Error('MPD URLがありません');
-  const parsed=[];
-  for(const url of result.mpds){
-   if(!enabled||location.href!==key)return;
-   try{
-    const r=await chrome.runtime.sendMessage({type:'FETCH',url});
-    if(r?.error)throw Error(r.error);
-    parsed.push(parsePlaylistMPD(r.text));
-   }catch{}
-  }
-  if(!parsed.length)throw Error('MPDを解析できません');
-  const videos=parsed.flatMap(x=>x.videos).sort((a,b)=>b.width*b.height-a.width*a.height);
-  const rank=c=>/ec-3/i.test(c||'')?3:/ac-3/i.test(c||'')?2:/mp4a/i.test(c||'')?1:0;
-  const audios=parsed.flatMap(x=>x.audios).sort((a,b)=>(b.channels||0)-(a.channels||0)||rank(b.codec)-rank(a.codec));
-  const v=videos[0],a=audios[0],atmos=parsed.some(x=>x.atmos);
-  if(enabled&&location.href===key){playlistHighest='映像 '+(v?q(v.width,v.height):'未確認')+' · 音声 '+(atmos?'Dolby Atmos':a?audio(a.codec,a.channels):'未確認');draw()}
+  const analysis=window.__uaiAnalyzePlaylist;
+  if(typeof analysis!=='function')throw Error('共通MPD解析が利用できません');
+  const summary=await analysis(result.mpds);
+  if(enabled&&location.href===key){playlistHighest='映像 '+summary.video+' · 音声 '+summary.audio;draw()}
+
  }catch(e){
   if(enabled&&location.href===key){playlistHighest='映像 取得不可 · 音声 取得不可';playlistRetryAt=Date.now()+15000;draw()}
  }finally{playlistBusy=false}
