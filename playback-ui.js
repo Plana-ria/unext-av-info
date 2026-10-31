@@ -25,24 +25,20 @@ function mseAudio(){
  return audio(t,ch);
 }
 function highestQuality(){
- const variants=(last?.variants||[]).filter(x=>x.allowedByApplication!==false&&x.allowedByKeySystem!==false);
- if(!variants.length){
-  const manifest=last?.manifest;
-  if(!manifest)return '映像 取得不可 · 音声 取得不可';
-  const videoBest=(manifest.video||[]).sort((a,b)=>b.width*b.height-a.width*a.height)[0];
-  const rank=c=>/ec-3/i.test(c||'')?3:/ac-3/i.test(c||'')?2:/mp4a/i.test(c||'')?1:0;
-  const audioBest=(manifest.audio||[]).sort((a,b)=>rank(b.codec)-rank(a.codec)||b.channels-a.channels)[0];
-  return '映像 '+(videoBest?q(videoBest.width,videoBest.height):'取得不可')+' · 音声 '+(audioBest?audio(audioBest.codec,audioBest.channels):'取得不可');
- }
- const videoBest=variants.filter(x=>x.width>0&&x.height>0).sort((a,b)=>(b.width*b.height)-(a.width*a.height))[0];
- const audioRank=x=>/ec-3/i.test(x.audioCodec||'')?3:/ac-3/i.test(x.audioCodec||'')?2:/mp4a/i.test(x.audioCodec||'')?1:0;
- const audioBest=variants.filter(x=>x.audioCodec).sort((a,b)=>audioRank(b)-audioRank(a)||(Number(b.channelsCount)||0)-(Number(a.channelsCount)||0)||(b.bandwidth||0)-(a.bandwidth||0))[0];
- return '映像 '+(videoBest?q(videoBest.width,videoBest.height):'取得不可')+' · 音声 '+(audioBest?trackAudio(audioBest):'取得不可');
+ const manifest=last?.manifest;
+ // Only a raw playback MPD can establish the upper bound of its representations.
+ // Shaka's track list can already be restricted to the selected/allowed track.
+ if(manifest?.source!=='mpd')return '映像 未確認 · 音声 未確認';
+ const videos=manifest.video||[],audios=manifest.audio||[];
+ const v=videos.filter(x=>x.width>0&&x.height>0).sort((a,b)=>b.width*b.height-a.width*a.height)[0];
+ const rank=c=>/ec-3/i.test(c||'')?3:/ac-3/i.test(c||'')?2:/mp4a/i.test(c||'')?1:0;
+ const a=audios.filter(x=>x.codec).sort((a,b)=>rank(b.codec)-rank(a.codec)||(b.channels||0)-(a.channels||0))[0];
+ return '映像 '+(v?q(v.width,v.height):'未確認')+' · 音声 '+(a?audio(a.codec,a.channels):'未確認');
 }
 function draw(){
  const v=video(),w=v?.videoWidth||last?.video?.width||last?.track?.width||last?.stats?.width,h=v?.videoHeight||last?.video?.height||last?.track?.height;
  const identified=last?.track?.audioCodec?trackAudio(last.track):null;
- const text='現在：映像 '+q(w,h)+' · 音声 '+(identified||(mseAudio()||'取得不可'))+'\n候補最高：'+highestQuality();
+ const text='現在：映像 '+q(w,h)+' · 音声 '+(identified||(mseAudio()||'取得不可'))+'\nMPD内最高：'+highestQuality();
  for(const el of document.querySelectorAll('.'+CLS))el.textContent=text;
 }
 async function reinject(){if(!enabled)return;try{await chrome.runtime.sendMessage({type:'PLAYBACK_HOOK'})}catch{}}
