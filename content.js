@@ -88,7 +88,7 @@ window.__uaiAnalyzePlaylist=async function(mpds){
  if(!success)throw Error('MPD解析ができませんでした');
  video.sort((a,b)=>b.w*b.h-a.w*a.h||b.bitrate-a.bitrate);
  audio.sort((a,b)=>channelCount(b)-channelCount(a)||(/ec-3/i.test(b.c)?1:0)-(/ec-3/i.test(a.c)?1:0)||b.bitrate-a.bitrate);
- return {video:video[0]?videoLabel(video[0])+' / '+codec(video[0].c):'未確認',audio:atmos?'Dolby Atmos':audio[0]?audioLabel(audio[0]):'未確認',success};
+ return {video:video[0]?videoLabel(video[0])+' ('+codec(video[0].c)+')':'未確認',audio:atmos?'Dolby Atmos':audio[0]?audioLabel(audio[0]):'未確認',success};
 };
 function fpsNumber(s){if(!s)return 24;const [n,d]=String(s).split('/').map(Number);return Number.isFinite(n)&&n>0&&(!d||d>0)?n/(d||1):24}
 function channelCount(a){return Number(a.channels)||(/F801/i.test(a.config)&&/ec-3|ac-3/i.test(a.c)?6:0)}
