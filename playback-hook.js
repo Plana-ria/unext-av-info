@@ -18,7 +18,7 @@ function parseManifest(xml){
     else if(kind==='audio'||mime.startsWith('audio/')||/^(ec-3|ac-3|mp4a)/i.test(codec))audio.push({codec,channels});
    }
   }
-  if(video.length||audio.length)observedManifest={video,audio};
+  if(video.length||audio.length)observedManifest={video,audio,source:'mpd'};
  }catch{}
 }
 function inspectManifestUrl(url){try{return /\.mpd(?:[?#]|$)/i.test(new URL(url,location.href).pathname)}catch{return false}}
@@ -26,7 +26,7 @@ function looksLikeManifest(contentType){return /dash\+xml|mpegurl|application\/x
 function readPlayerManifest(p){
  try{
   const m=p?.getManifest?.();if(!m?.variants?.length)return null;
-  return {video:m.variants.flatMap(v=>v.video?[{width:v.video.width||0,height:v.video.height||0,codec:v.video.codecs||''}]:[]),audio:m.variants.flatMap(v=>v.audio?[{codec:v.audio.codecs||'',channels:Number(v.audio.channelsCount)||0}]:[])};
+  return {source:'shaka',video:m.variants.flatMap(v=>v.video?[{width:v.video.width||0,height:v.video.height||0,codec:v.video.codecs||''}]:[]),audio:m.variants.flatMap(v=>v.audio?[{codec:v.audio.codecs||'',channels:Number(v.audio.channelsCount)||0}]:[])};
  }catch{return null}
 }
 const nativeFetch=window.fetch;
@@ -100,7 +100,7 @@ window.addEventListener('message',e=>{
   video:v?{width:v.videoWidth,height:v.videoHeight,readyState:v.readyState}:null,
   track:track?{width:track.width,height:track.height,audioCodec:track.audioCodec,channelsCount:track.channelsCount}:null,
   stats:stats?{width:stats.width,height:stats.height}:null,
-  manifest:readPlayerManifest(player)||observedManifest,
+  manifest:observedManifest||readPlayerManifest(player),
   variants:variants.map(x=>({width:x.width,height:x.height,audioCodec:x.audioCodec,videoCodec:x.videoCodec,channelsCount:x.channelsCount,bandwidth:x.bandwidth,allowedByApplication:x.allowedByApplication,allowedByKeySystem:x.allowedByKeySystem})),
   mse:{hooked:mse.hooked,sourceBuffers:mse.sourceBuffers.map(x=>({...x})),appendCount:mse.appendCount}
  }},location.origin);
