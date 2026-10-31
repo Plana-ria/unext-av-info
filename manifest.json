@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "U-NEXT AV Info (非公式)",
+  "version": "0.3.0",
+  "description": "U-NEXT作品ページに音声・映像の配信情報を表示する非公式Chrome拡張機能",
+  "permissions": [
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://video.unext.jp/*",
+    "https://cc.unext.jp/*",
+    "https://playlist.unext.jp/*",
+    "https://*.unext.jp/*",
+    "https://*.nxtv.jp/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://video.unext.jp/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "U-NEXT AV Info"
+  }
+}
