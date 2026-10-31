@@ -1,7 +1,7 @@
 (()=>{if(window.__uaiPlaybackUi)return;window.__uaiPlaybackUi=true;
 const CLS='uai-playback-info';let serial=0,waiting=false,last=null,lastReply=0,lastPath='';
 function q(w,h){return !w||!h?'取得不可':h>=2160?'4K':h>=1080?'1080p':h>=720?'720p':h+'p'}
-function audio(t,ch){const name=/ec-3/i.test(t)?'Dolby Digital Plus':/ac-3/i.test(t)?'Dolby Digital':/mp4a/i.test(t)?'AAC':'音声形式不明';return name+' ('+(ch===2?'2.0ch':ch===1?'1.0ch':ch===6?'5.1ch':ch?ch+'ch・配置未確認':'ch未確認')+')'}
+function audio(t,ch){const name=/ec-3/i.test(t)?'Dolby Digital Plus':/ac-3/i.test(t)?'Dolby Digital':/mp4a/i.test(t)?'AAC':'音声形式不明';return name+' ('+(ch===2?'2.0ch':ch===1?'1.0ch':ch===6?'6ch・配置未確認':ch?ch+'ch・配置未確認':'ch未確認')+')'}
 function trackAudio(t){if(!t?.audioCodec)return '取得不可';return audio(t.audioCodec,t.channelsCount)}
 function video(){return [...document.querySelectorAll('video')].find(v=>v.videoWidth&&v.videoHeight)||document.querySelector('video')}
 function mount(){
@@ -15,7 +15,7 @@ function mount(){
  draw();
 }
 function mseAudio(){
- const buffers=last?.mse?.sourceBuffers?.filter(x=>/^audio\//i.test(x.mime))||[];
+ const buffers=last?.mse?.sourceBuffers?.filter(x=>/^audio\//i.test(x.mime)&&x.appends>0)||[];
  if(!buffers.length)return null;
  const b=buffers[buffers.length-1],t=b.mime;
  const entries=b.initSniff?.audioEntries||[];
@@ -25,7 +25,8 @@ function mseAudio(){
 }
 function draw(){
  const v=video(),w=v?.videoWidth||last?.video?.width||last?.track?.width||last?.stats?.width,h=v?.videoHeight||last?.video?.height||last?.track?.height;
- const text='映像 '+q(w,h)+' · 音声 '+(last?.track?trackAudio(last.track):(mseAudio()||'取得不可'));
+ const identified=last?.track?.audioCodec?trackAudio(last.track):null;
+ const text='映像 '+q(w,h)+' · 音声 '+(identified||(mseAudio()||'取得不可'));
  for(const el of document.querySelectorAll('.'+CLS))el.textContent=text;
 }
 async function reinject(){try{await chrome.runtime.sendMessage({type:'PLAYBACK_HOOK'})}catch{}}
