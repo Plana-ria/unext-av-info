@@ -21,7 +21,7 @@ function parseManifest(xml){
   if(video.length||audio.length)observedManifest={video,audio};
  }catch{}
 }
-function inspectManifestUrl(url){try{return /\\.mpd(?:[?#]|$)/i.test(new URL(url,location.href).href)}catch{return false}}
+function inspectManifestUrl(url){try{return /\.mpd(?:[?#]|$)/i.test(new URL(url,location.href).href)}catch{return false}}
 const nativeFetch=window.fetch;
 if(typeof nativeFetch==='function'){
  window.fetch=function(...args){
@@ -35,8 +35,8 @@ XMLHttpRequest.prototype.open=function(method,url){this.__uaiManifestUrl=inspect
 XMLHttpRequest.prototype.send=function(){
  if(this.__uaiManifestUrl)this.addEventListener('load',()=>{
   try{if(this.status>=200&&this.status<300){
-   if(typeof this.responseText==='string')parseManifest(this.responseText);
-   else if(this.response instanceof ArrayBuffer)parseManifest(new TextDecoder().decode(this.response));
+   if(this.responseType==='arraybuffer'&&this.response instanceof ArrayBuffer)parseManifest(new TextDecoder().decode(this.response));
+   else if(!this.responseType||this.responseType==='text')parseManifest(this.responseText);
   }}catch{}
  },{once:true});
  return xhrSend.apply(this,arguments);
