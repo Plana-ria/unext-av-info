@@ -26,7 +26,14 @@ function mseAudio(){
 }
 function highestQuality(){
  const variants=(last?.variants||[]).filter(x=>x.allowedByApplication!==false&&x.allowedByKeySystem!==false);
- if(!variants.length)return '映像 取得不可 · 音声 取得不可';
+ if(!variants.length){
+  const manifest=last?.manifest;
+  if(!manifest)return '映像 取得不可 · 音声 取得不可';
+  const videoBest=(manifest.video||[]).sort((a,b)=>b.width*b.height-a.width*a.height)[0];
+  const rank=c=>/ec-3/i.test(c||'')?3:/ac-3/i.test(c||'')?2:/mp4a/i.test(c||'')?1:0;
+  const audioBest=(manifest.audio||[]).sort((a,b)=>rank(b.codec)-rank(a.codec)||b.channels-a.channels)[0];
+  return '映像 '+(videoBest?q(videoBest.width,videoBest.height):'取得不可')+' · 音声 '+(audioBest?audio(audioBest.codec,audioBest.channels):'取得不可');
+ }
  const videoBest=variants.filter(x=>x.width>0&&x.height>0).sort((a,b)=>(b.width*b.height)-(a.width*a.height))[0];
  const audioRank=x=>/ec-3/i.test(x.audioCodec||'')?3:/ac-3/i.test(x.audioCodec||'')?2:/mp4a/i.test(x.audioCodec||'')?1:0;
  const audioBest=variants.filter(x=>x.audioCodec).sort((a,b)=>audioRank(b)-audioRank(a)||(Number(b.channelsCount)||0)-(Number(a.channelsCount)||0)||(b.bandwidth||0)-(a.bandwidth||0))[0];
