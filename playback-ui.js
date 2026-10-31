@@ -39,12 +39,10 @@ async function loadPlaylistHighest(){
  if(playlistHighest||playlistAttempts>=2)return;
  const generation=playlistGeneration,id='playback-'+generation+'-'+(++serial);
  playlistBusy=true;playlistAttempts++;
- let cancelReply=()=>{};
  const valid=()=>enabled&&location.href===key&&playlistGeneration===generation;
  const replyData=()=>new Promise((resolve,reject)=>{
   const timer=setTimeout(()=>{window.removeEventListener('message',handler);reject(Error('プレイリスト応答タイムアウト'))},12000);
   function handler(e){if(e.source!==window||e.data?.source!=='UAI_PLAYBACK_PLAYLIST_RESULT'||e.data.id!==id)return;clearTimeout(timer);window.removeEventListener('message',handler);resolve(e.data.data)}
-  cancelReply=()=>{clearTimeout(timer);window.removeEventListener('message',handler);reject(Error('キャンセル'))};
   window.addEventListener('message',handler);
   window.postMessage({source:'UAI_PLAYBACK_QUERY',id},location.origin);
  });
@@ -67,7 +65,7 @@ async function loadPlaylistHighest(){
   playlistHighest=playlistAttempts>=2?'映像 取得不可 · 音声 取得不可':null;
   if(!playlistHighest)setTimeout(()=>{if(valid())loadPlaylistHighest()},1200);
   draw();
- }finally{cancelReply=()=>{};if(valid())playlistBusy=false}
+ }finally{if(valid())playlistBusy=false}
 }
 
 function draw(){
@@ -79,6 +77,7 @@ function draw(){
 async function reinject(){if(!enabled)return;try{await chrome.runtime.sendMessage({type:'PLAYBACK_HOOK'})}catch{}}
 function query(){
  if(!enabled||!location.pathname.startsWith('/play/'))return;
+ if(lastPath!==location.href){lastPath=location.href;resetPlaylist();last=null;lastReply=0}
  loadPlaylistHighest();
  mount();if(waiting)return;waiting=true;
  const id=++serial;let finished=false;
@@ -92,6 +91,6 @@ chrome.runtime.onMessage.addListener(m=>{if(m?.type==='UAI_ENABLED_CHANGED')setE
 chrome.runtime.sendMessage({type:'UAI_GET_ENABLED'}).then(r=>setEnabled(r?.enabled!==false)).catch(()=>{});
 let scheduled=false;
 new MutationObserver(()=>{if(scheduled)return;scheduled=true;setTimeout(()=>{scheduled=false;mount()},350)}).observe(document.documentElement,{childList:true,subtree:true});
-setInterval(()=>{if(!enabled)return;if(lastPath!==location.href){lastPath=location.href;resetPlaylist();last=null;lastReply=0}query()},2500);
+setInterval(()=>{if(enabled)query()},2500);
 reinject();setTimeout(query,500);
 })();
