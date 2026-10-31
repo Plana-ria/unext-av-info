@@ -33,7 +33,7 @@ const aud=[],vid=[];for(const set of d.querySelectorAll('AdaptationSet')){const 
 let ac=r.querySelector('AudioChannelConfiguration')||set.querySelector('AudioChannelConfiguration');const conf=ac?.getAttribute('value')||'';let channels=null;if(/^\d+$/.test(conf))channels=+conf;else if(/^F801$/i.test(conf)&&/ec-3|ac-3/i.test(c))channels=6;
 aud.push({c,channels,config:conf,bitrate:+base||0,rate:attrs(r,'audioSamplingRate')||attrs(set,'audioSamplingRate')||'',representation:r,adaptation:set})}}
 const mpdAtmos=[...d.querySelectorAll('SupplementalProperty,EssentialProperty')].some(p=>/EC3_ExtensionType/i.test(p.getAttribute('schemeIdUri')||'')&&/JOC/i.test(p.getAttribute('value')||'')&&!!aud.find(a=>/ec-3/i.test(a.c)));return{aud,vid,mpdAtmos,d}}
-function parseDec3(bytes){for(let i=0;i+12<bytes.length;i++){if(bytes[i+4]!==100||bytes[i+5]!==101||bytes[i+6]!==99||bytes[i+7]!==51)continue;const n=(bytes[i]*16777216+bytes[i+1]*65536+bytes[i+2]*256+bytes[i+3])>>>0;if(n<8||i+n>bytes.length)continue;const p=bytes.slice(i+8,i+n);const hex=[...p].map(v=>v.toString(16).padStart(2,'0')).join(' ');return {hex,atmos:p.length>=7&&p[p.length-2]===1&&p[p.length-1]>0,bytes:p.length}}return null}
+function parseDec3(bytes){for(let i=0;i+12<bytes.length;i++){if(bytes[i+4]!==100||bytes[i+5]!==101||bytes[i+6]!==99||bytes[i+7]!==51)continue;const n=(bytes[i]*16777216+bytes[i+1]*65536+bytes[i+2]*256+bytes[i+3])>>>0;if(n<10||i+n>bytes.length)continue;const p=bytes.slice(i+8,i+n);const numIndSub=p[1]&7;const bsid=(p[2]>>3)&31;if(numIndSub>7||bsid<11||bsid>16)continue;const hex=[...p].map(v=>v.toString(16).padStart(2,'0')).join(' ');return {hex,atmos:p.length>=7&&p[p.length-2]===1&&p[p.length-1]>0,bytes:p.length}}return null}
 async function checkInit(parsed,mpdUrl){
 const direct=(n,name)=>[...n?.children||[]].find(x=>x.localName===name);
 const list=[];
@@ -71,11 +71,13 @@ return {atmos:false,details:(list.join('\n')||'初期化情報なし')+(tracks.l
 }
 
 // Shared MPD inspection for the playback page. Does not infer the maximum from the active player track.
-window.__uaiAnalyzePlaylist=async function(mpds){
+window.__uaiAnalyzePlaylist=async function(mpds,isCurrent=()=>true){
  if(!Array.isArray(mpds)||!mpds.length)throw Error('MPD URLがありません');
  const audio=[],video=[];let atmos=false,success=0;
  for(const url of mpds.slice(0,3)){
+  if(!isCurrent())throw Error('解析が中断されました');
   const response=await chrome.runtime.sendMessage({type:'FETCH',url});
+  if(!isCurrent())throw Error('解析が中断されました');
   if(response?.error)continue;
   let parsed;try{parsed=mpdParse(response.text)}catch{continue}
   if(!parsed.aud.length&&!parsed.vid.length)continue;
@@ -83,6 +85,7 @@ window.__uaiAnalyzePlaylist=async function(mpds){
   if(parsed.mpdAtmos)atmos=true;
   if(!atmos&&parsed.aud.some(x=>/ec-3/i.test(x.c))){
    try{atmos=(await checkInit(parsed,url)).atmos}catch{}
+   if(!isCurrent())throw Error('解析が中断されました');
   }
  }
  if(!success)throw Error('MPD解析ができませんでした');
