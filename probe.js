@@ -2,15 +2,16 @@
 
 // Track title IDs passed through GraphQL POST requests during SPA navigation.
 // Capture only public title identifiers; never store credentials or response bodies.
-let observedTitle=null,observedRoute=null,extensionEnabled=false;
+let observedTitle=null,observedRoute=null,observedEpisode=null,extensionEnabled=false;
 function recordTitle(source){
  try{
   const items=Array.isArray(source)?source:[source];
   for(const item of items){
    if(!item||typeof item!=='object')continue;
    const op=String(item.operationName||'');
-   if(!['cosmo_getVideoTitle','cosmo_getVideoTitleEpisodes','cosmo_getVideoTitleRelatedStuffs'].includes(op))continue;
+   if(!['cosmo_getVideoTitle','cosmo_getVideoTitleEpisodes','cosmo_getVideoTitleRelatedStuffs','cosmo_getPlaylistUrl'].includes(op))continue;
    const code=item.variables?.code;
+   if(op==='cosmo_getPlaylistUrl'&&typeof code==='string'&&/^ED\\d+$/.test(code)){observedEpisode=code;window.postMessage({source:'UAI_EPISODE_FOUND',episode:code},location.origin)}
    if(typeof code==='string'&&/^SID\d+$/.test(code)){
     observedTitle=code;observedRoute=location.href;
     window.postMessage({source:'UAI_TITLE_FOUND',title:code},location.origin);
@@ -51,6 +52,7 @@ window.addEventListener('message',e=>{
  if(e.source!==window||e.data?.source!=='UAI_GET_TITLE'||!extensionEnabled)return;
  if(e.data.fresh&&observedRoute!==location.href){observedTitle=null;observedRoute=null}
  if(observedTitle)window.postMessage({source:'UAI_TITLE_FOUND',title:observedTitle},location.origin);
+ if(observedEpisode)window.postMessage({source:'UAI_EPISODE_FOUND',episode:observedEpisode},location.origin);
 });
 const hashes={episodes:'8bc4fa1b6e96812ac7836912a04eb511616511b10a25da8447d2afd389fd39dc',playlist:'a2309e22a6819ff747cf9a389dd78db35fa3c386fac1d53461061ba20fa44e34'};
 function entries(){return performance.getEntriesByType('resource').map(e=>e.name)}
