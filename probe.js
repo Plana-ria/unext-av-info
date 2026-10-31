@@ -35,7 +35,7 @@ function inspectRequest(url,body){
 }
 const originalFetch=window.fetch;
 if(typeof originalFetch==='function')window.fetch=function(input,init){
- try{inspectRequest(input,init?.body??(input instanceof Request?input:null));}catch{}
+ try{inspectRequest(input,init?.body);if(!init?.body&&input instanceof Request&&input.method==='POST'&&new URL(input.url,location.href).hostname==='cc.unext.jp')input.clone().text().then(inspectBody).catch(()=>{});}catch{}
  return originalFetch.apply(this,arguments);
 };
 const originalOpen=XMLHttpRequest.prototype.open,originalSend=XMLHttpRequest.prototype.send;
