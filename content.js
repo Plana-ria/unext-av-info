@@ -1,14 +1,15 @@
 (()=>{if(window.__unextAvInfoActive)return;window.__unextAvInfoActive=true;
-const ID='unext-av-info-card';let current='',busy=false,runId=0,lastUrl=location.href;
-function sid(){const m=location.pathname.match(/SID\d+/);if(m)return m[0];if(observedTitle)return observedTitle;const a=performance.getEntriesByType('resource');for(let i=a.length-1;i>=0;i--){try{const u=new URL(a[i].name);if(u.hostname!=='cc.unext.jp'||!['cosmo_getVideoTitle','cosmo_getVideoTitleEpisodes','cosmo_getVideoTitleRelatedStuffs'].includes(u.searchParams.get('operationName')))continue;const id=JSON.parse(u.searchParams.get('variables')||'{}').code;if(/^SID\d+$/.test(id))return id}catch{}}return null}
+const ID='unext-av-info-card';let current='',busy=false,runId=0,lastUrl=location.href,resourceSince=performance.now();
+function sid(){const m=location.pathname.match(/SID\d+/);if(m)return m[0];if(observedTitle)return observedTitle;const a=performance.getEntriesByType('resource').filter(e=>e.startTime>=resourceSince);for(let i=a.length-1;i>=0;i--){try{const u=new URL(a[i].name);if(u.hostname!=='cc.unext.jp'||!['cosmo_getVideoTitle','cosmo_getVideoTitleEpisodes','cosmo_getVideoTitleRelatedStuffs'].includes(u.searchParams.get('operationName')))continue;const id=JSON.parse(u.searchParams.get('variables')||'{}').code;if(/^SID\d+$/.test(id))return id}catch{}}return null}
 function anchor(){return [...document.querySelectorAll('h2')].find(h=>h.textContent.trim()==='キャスト・スタッフ')?.parentElement}
 let observedTitle=null;
 window.addEventListener('message',e=>{
  if(e.source!==window||e.data?.source!=='UAI_TITLE_FOUND'||!/^SID\d+$/.test(e.data.title||''))return;
- if(observedTitle!==e.data.title){observedTitle=e.data.title;current='';schedule()}
+ if(observedTitle!==e.data.title){observedTitle=e.data.title;invalidate();schedule()}
 });
 window.postMessage({source:'UAI_GET_TITLE'},location.origin);
 const rootOf=()=>document.getElementById(ID)?.shadowRoot;
+function invalidate(){++runId;busy=false;current='';const links=rootOf()?.getElementById('official-links');if(links)links.hidden=true;render('準備中','確認中','作品情報を待っています','確認中','作品情報を待っています','','')}
 function render(state,a,as,v,vs,note,detail){const sh=rootOf();if(!sh)return;for(const [k,value] of Object.entries({state,a,as,v,vs,note,detail}))sh.getElementById(k).textContent=value??'';sh.getElementById('note').hidden=!note;sh.getElementById('actions').hidden=state!=='取得失敗'}
 function card(){const host=document.createElement('section');host.id=ID;const sh=host.attachShadow({mode:'open'});sh.innerHTML=`<style>
 :host{display:block;width:100%;margin:0 0 42px;color:#edf4fc;font:inherit}*{box-sizing:border-box}.panel{background:rgba(24,37,54,.77);border:1px solid #415264;border-radius:14px;padding:22px}header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}h2{font-size:23px;font-weight:700;color:white;margin:0}.state{font-size:12px;color:#c5d6e8}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.metric{border:1px solid #3a4e62;background:rgba(255,255,255,.04);border-radius:10px;padding:16px;min-width:0}.label{font-size:12px;color:#b5c8d9;margin-bottom:7px}.primary{font-size:21px;font-weight:700;overflow-wrap:anywhere}.sub{font-size:12px;color:#c4d2de;margin-top:5px;overflow-wrap:anywhere}.official-links[hidden],.official-links .help-link[hidden]{display:none!important}.official-links{margin-top:14px;padding-top:12px;border-top:1px solid #415264}.official-links .help-link{display:block;width:fit-content;margin-top:8px}.help-link{display:inline-block;margin-top:10px;font-size:12px;color:#9bd4ff;text-decoration:underline;text-underline-offset:2px}.help-link:hover{color:#cdeaff}.help-link:focus-visible{outline:2px solid #9bd4ff;outline-offset:3px}.note[hidden]{display:none}.note{white-space:pre-line;font-size:11px;color:#b2c1d2;margin-top:14px;line-height:1.7}details{margin-top:15px;font-size:12px;color:#c3d3df}summary{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;line-height:1.5}button{background:#29445f;border:1px solid #56718b;border-radius:7px;color:white;padding:8px 13px;cursor:pointer}#actions{margin-top:12px}#actions[hidden]{display:none!important}@media(max-width:650px){.grid{grid-template-columns:1fr}.panel{padding:15px}h2{font-size:19px}}</style>
@@ -117,13 +118,13 @@ async function checkPlaybackCapabilities(videos,audios,atmos){
  }
  return {note:notices.join('\n'),detail:details};
 }
-async function run(){const id=++runId;busy=true;const links=rootOf()?.getElementById('official-links');if(links)links.hidden=true;render('照会中','確認中','音声情報を取得中','確認中','画質情報を取得中','配信情報を解析しています。','');
-const fail=e=>{if(id!==runId)return;busy=false;render('取得失敗','判定不能','音声情報を取得できませんでした','判定不能','画質情報を取得できませんでした',String(e.message||e),'エラー: '+String(e.message||e))};
+async function run(title=sid()){if(!title)return;const id=++runId,requestUrl=location.href;const valid=()=>id===runId&&location.href===requestUrl&&sid()===title;busy=true;const links=rootOf()?.getElementById('official-links');if(links)links.hidden=true;render('照会中','確認中','音声情報を取得中','確認中','画質情報を取得中','配信情報を解析しています。','');
+const fail=e=>{if(!valid())return;busy=false;render('取得失敗','判定不能','音声情報を取得できませんでした','判定不能','画質情報を取得できませんでした',String(e.message||e),'エラー: '+String(e.message||e))};
 try{const injected=await chrome.runtime.sendMessage({type:'INJECT'});if(injected?.error)throw Error(injected.error);
-const data=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{window.removeEventListener('message',handler);reject(Error('API応答タイムアウト'))},16000);function handler(e){if(e.source!==window||e.data?.source!=='UAI_RESULT'||e.data.id!==id)return;clearTimeout(timer);window.removeEventListener('message',handler);resolve(e.data.data)}window.addEventListener('message',handler);window.postMessage({source:'UAI_QUERY',id},location.origin)});
-if(data.error)throw Error(data.error);if(!data.mpds?.length)throw Error('MPD URLを取得できませんでした');let last;
+const data=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{window.removeEventListener('message',handler);reject(Error('API応答タイムアウト'))},16000);function handler(e){if(e.source!==window||e.data?.source!=='UAI_RESULT'||e.data.id!==id)return;clearTimeout(timer);window.removeEventListener('message',handler);resolve(e.data.data)}window.addEventListener('message',handler);window.postMessage({source:'UAI_QUERY',id,title},location.origin)});
+if(!valid())return;if(data.title&&data.title!==title)throw Error('作品IDが一致しません');if(data.error)throw Error(data.error);if(!data.mpds?.length)throw Error('MPD URLを取得できませんでした');let last;
 for(const url of data.mpds){try{const r=await chrome.runtime.sendMessage({type:'FETCH',url});if(r?.error)throw Error(r.error);const parsed=mpdParse(r.text);if(!parsed.aud.length&&!parsed.vid.length)throw Error('MPDに映像・音声情報がありません');
-const init=await checkInit(parsed,url);if(id!==runId)return;setOfficialHelpLinks(parsed);
+const init=await checkInit(parsed,url);if(!valid())return;setOfficialHelpLinks(parsed);
 const aud=parsed.aud.sort((a,b)=>(b.channels||0)-(a.channels||0)||b.bitrate-a.bitrate),a=aud[0],best=parsed.vid.sort((a,b)=>b.w*b.h-a.w*a.h)[0];
 const atmos=parsed.mpdAtmos||init.atmos;const audioMain=atmos?'Dolby Atmos':a?channel(a):'不明',audioSub=a?codec(a.c):'音声情報なし';
 const videoMain=!best?'不明':best.h>=2160?'4K UHD':best.h>=1080?'Full HD':best.h>=720?'HD':best.h+'p',videoSub=best?best.w+'×'+best.h+' / '+codec(best.c):'映像情報なし';
@@ -131,25 +132,25 @@ const note='この環境での再生対応状況を確認中です。';
 const detail='作品: '+data.title+' / '+data.ep+'\nAtmos(MPD): '+(parsed.mpdAtmos?'検出':'未確認')+'\n'+init.details+'\n音声:\n'+aud.map(t=>codec(t.c)+' / '+channel(t)+' / '+t.bitrate+'bps / '+t.rate+'Hz').join('\n')+'\n映像:\n'+parsed.vid.map(t=>t.w+'×'+t.h+' / '+codec(t.c)+' / '+t.bitrate+'bps').join('\n')+'\n※MPDにある配信候補であり、実際の再生形式は端末によります。';
 render('解析完了',audioMain,audioSub,videoMain,videoSub,note,detail);
 const capability=await checkPlaybackCapabilities(parsed.vid,parsed.aud,atmos);
-if(id!==runId)return;
+if(!valid())return;
 render('解析完了',audioMain,audioSub,videoMain,videoSub,capability.note,detail+'\n再生対応判定: '+capability.detail);
 busy=false;return;
 }catch(e){last=e}}throw last||Error('MPD解析失敗')}
 catch(e){fail(e)}}
 function attach(){
  const target=anchor();
- if(!target){document.getElementById(ID)?.remove();current='';return}
+ if(!target){if(current)invalidate();document.getElementById(ID)?.remove();return}
  let host=document.getElementById(ID);const fresh=!host;if(!host)host=card();
  if(host.nextElementSibling!==target||host.parentElement!==target.parentElement)target.before(host);
  const title=sid();
  if(!title){
-  if(current!=='waiting'){current='waiting';render('準備中','確認中','作品情報を待っています','確認中','作品情報を待っています','作品情報の読み込みを待っています。','')}
+  if(current!=='waiting'){invalidate();current='waiting';render('準備中','確認中','作品情報を待っています','確認中','作品情報を待っています','作品情報の読み込みを待っています。','')}
   return;
  }
  const key=title+'|'+location.pathname;
- if(key!==current||fresh){current=key;run()}
+ if(key!==current||fresh){if(current&&current!==key)invalidate();current=key;run(title)}
 }
 let pending=false;function schedule(){if(pending)return;pending=true;setTimeout(()=>{pending=false;attach()},300)}
 new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true});
-setInterval(()=>{if(lastUrl!==location.href){lastUrl=location.href;current='';schedule()}else if(anchor()&&(!sid()||!document.getElementById(ID)))schedule()},700);
+setInterval(()=>{if(lastUrl!==location.href){lastUrl=location.href;resourceSince=performance.now();observedTitle=null;invalidate();window.postMessage({source:'UAI_GET_TITLE',fresh:true},location.origin);schedule()}else if(anchor()&&(!sid()||!document.getElementById(ID)))schedule()},700);
 schedule()})();
