@@ -88,8 +88,11 @@ async function checkPlaybackCapabilities(videos,audios,atmos){
  if(!navigator.mediaCapabilities?.decodingInfo)return {note:'この環境での再生対応判定は利用できません。最高品質での視聴にはU-NEXTの対応端末が必要になる場合があります。',detail:'MediaCapabilities API が利用できません'};
  if(!videos.length||!audios.length)return {note:'この環境での再生対応判定は確認できません。',detail:'音声または映像トラックが取得できません'};
  const combinations=[];
- for(const v of videos)for(const a of audios)combinations.push({v,a});
  const results=[];
+ for(const v of videos)for(const a of audios){
+  if(!channelCount(a)||!v.w||!v.h||!v.c||!a.c)results.push({v,a,state:'unknown'});
+  else combinations.push({v,a});
+ }
  // Bound concurrent MediaCapabilities queries to avoid stressing the title page.
  for(let i=0;i<combinations.length;i+=4){
  const batch=await Promise.all(combinations.slice(i,i+4).map(async x=>{
@@ -98,7 +101,7 @@ async function checkPlaybackCapabilities(videos,audios,atmos){
  }));results.push(...batch);
  }
  const supported=results.filter(r=>r.state==='yes'),unknown=results.filter(r=>r.state==='unknown');
- if(!supported.length)return {note:'この環境で再生可能な音声・映像の組み合わせを確認できませんでした。上記の最高品質で視聴するにはU-NEXTの対応端末が必要になる場合があります。',detail:'対応判定: 成功 '+supported.length+'件 / 未判定 '+unknown.length+'件'};
+ if(!supported.length)return {note:'この環境で再生可能な音声・映像の組み合わせを確認できませんでした。',detail:'対応判定: 対応 '+supported.length+'件 / 非対応 '+results.filter(r=>r.state==='no').length+'件 / 未判定 '+unknown.length+'件'};
  const bestVideo=supported.map(x=>x.v).sort((x,y)=>y.w*y.h-x.w*x.h||y.bitrate-x.bitrate)[0];
  const bestAudio=supported.map(x=>x.a).sort((x,y)=>channelCount(y)-channelCount(x)||(/ec-3/i.test(y.c)?1:0)-(/ec-3/i.test(x.c)?1:0)||y.bitrate-x.bitrate)[0];
  const videoBest=videos.slice().sort((a,b)=>b.w*b.h-a.w*a.h)[0];
