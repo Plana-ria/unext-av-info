@@ -1,3 +1,18 @@
+
+// These radio items appear on the extension icon's right-click menu.
+const MENU_SAFE='uai-mode-safe',MENU_ALLOW='uai-mode-allow';
+async function installModeMenu(){
+ const settings=await chrome.storage.local.get('allowTitleAnalysis');
+ await chrome.contextMenus.removeAll();
+ chrome.contextMenus.create({id:MENU_SAFE,title:'作品ページではカードを表示しない（推奨）',type:'radio',contexts:['action'],checked:settings.allowTitleAnalysis!==true});
+ chrome.contextMenus.create({id:MENU_ALLOW,title:'視聴履歴への追加を許容して自動解析',type:'radio',contexts:['action'],checked:settings.allowTitleAnalysis===true});
+}
+chrome.runtime.onInstalled.addListener(()=>installModeMenu().catch(console.error));
+chrome.runtime.onStartup.addListener(()=>installModeMenu().catch(console.error));
+chrome.contextMenus.onClicked.addListener(async info=>{
+ if(info.menuItemId!==MENU_SAFE&&info.menuItemId!==MENU_ALLOW)return;
+ await chrome.storage.local.set({allowTitleAnalysis:info.menuItemId===MENU_ALLOW});
+});
 // A single toolbar toggle is shared by all U-NEXT tabs and persisted across restarts.
 let enabled=false;
 const activeFetches=new Set();
