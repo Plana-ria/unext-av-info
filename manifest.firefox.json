@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "description": "U-NEXTの配信画質・音声形式や再生中の品質を確認できる非公式ブラウザ拡張機能",
   "permissions": [
-    "scripting"
+    "scripting",
+    "storage"
   ],
   "host_permissions": [
     "https://video.unext.jp/*",
