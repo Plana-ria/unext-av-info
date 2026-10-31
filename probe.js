@@ -48,7 +48,9 @@ XMLHttpRequest.prototype.send=function(body){
  return originalSend.apply(this,arguments);
 };
 window.addEventListener('message',e=>{
- if(e.source===window&&e.data?.source==='UAI_GET_TITLE'&&observedTitle)window.postMessage({source:'UAI_TITLE_FOUND',title:observedTitle},location.origin);
+ if(e.source!==window||e.data?.source!=='UAI_GET_TITLE')return;
+ if(e.data.fresh){observedTitle=null;return}
+ if(observedTitle)window.postMessage({source:'UAI_TITLE_FOUND',title:observedTitle},location.origin);
 });
 const hashes={episodes:'8bc4fa1b6e96812ac7836912a04eb511616511b10a25da8447d2afd389fd39dc',playlist:'a2309e22a6819ff747cf9a389dd78db35fa3c386fac1d53461061ba20fa44e34'};
 function entries(){return performance.getEntriesByType('resource').map(e=>e.name)}
@@ -58,12 +60,14 @@ async function query(op,variables,hash){const r=route(),u=new URL('https://cc.un
 const version=(window.__NEXT_DATA__?.props?.pageProps?._sentryBaggage?.match(/sentry-release=([^,]+)/)?.[1]||'v130.1-prod-102c043').replace(/[^\w.-]/g,'');
 const response=await fetch(u.href,{credentials:'include',headers:{accept:'*/*','content-type':'application/json','apollographql-client-name':'cosmo','apollographql-client-version':version}});if(!response.ok)throw Error(op+' HTTP '+response.status);const body=await response.json();if(body.errors?.length)throw Error(body.errors.map(e=>e.message).join('; ').slice(0,150));return body.data}
 window.addEventListener('message',async e=>{const m=e.data;if(e.source!==window||m?.source!=='UAI_QUERY')return;const id=m.id;const send=data=>window.postMessage({source:'UAI_RESULT',id,data},location.origin);
-try{const title=sid();if(!title)throw Error('作品IDを検出できません');
-let ep=location.pathname.match(/ED\d+/)?.[0];if(!ep){const x=await query('cosmo_getVideoTitleEpisodes',{code:title,page:1,pageSize:20},hashes.episodes);ep=x?.webfront_title_titleEpisodes?.episodes?.[0]?.id;}
+try{const title=m.title;if(!/^SID\d+$/.test(title||''))throw Error('作品IDを検出できません');
+const requestUrl=location.href;const stillCurrent=()=>location.href===requestUrl;
+let ep=location.pathname.match(/ED\d+/)?.[0];if(!ep){const x=await query('cosmo_getVideoTitleEpisodes',{code:title,page:1,pageSize:20},hashes.episodes);if(!stillCurrent())return;ep=x?.webfront_title_titleEpisodes?.episodes?.[0]?.id;}
 if(!ep)throw Error('エピソードIDを取得できません');
 const x=await query('cosmo_getPlaylistUrl',{code:ep,playMode:'caption',bitrateLow:1500,bitrateHigh:null,validationOnly:false},hashes.playlist),info=x?.webfront_playlistUrl;if(!info)throw Error('プレイリスト情報がありません');
+if(!stillCurrent())return;
 const profiles=(info.urlInfo||[]).flatMap(x=>x.movieProfile||[]);
 const mpds=profiles.map(p=>p.playlistUrl).filter(s=>typeof s==='string'&&s.includes('.mpd')).map(s=>{const u=new URL(s);if(info.playToken)u.searchParams.set('play_token',info.playToken);return u.href});
 send({title,ep,mpds:mpds.slice(0,3),codecs:[...new Set(profiles.flatMap(p=>(p.movieAudioList||[]).map(a=>a.audioType)))]});
-}catch(err){send({error:String(err.message||err).slice(0,200)})}});
+}catch(err){send({title:m.title,error:String(err.message||err).slice(0,200)})}});
 })();
