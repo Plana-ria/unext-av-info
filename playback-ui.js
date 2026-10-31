@@ -1,10 +1,11 @@
 (()=>{if(window.__uaiPlaybackUi)return;window.__uaiPlaybackUi=true;
-const CLS='uai-playback-info';let serial=0,waiting=false,last=null,lastReply=0,lastPath='';
+const CLS='uai-playback-info';let enabled=false;let serial=0,waiting=false,last=null,lastReply=0,lastPath='';
 function q(w,h){return !w||!h?'取得不可':h>=2160?'4K':h>=1080?'1080p':h>=720?'720p':h+'p'}
 function audio(t,ch){const name=/ec-3/i.test(t)?'Dolby Digital Plus':/ac-3/i.test(t)?'Dolby Digital':/mp4a/i.test(t)?'AAC':'音声形式不明';return name+' ('+(ch===2?'2.0ch':ch===1?'1.0ch':ch===6?'6ch・配置未確認':ch?ch+'ch・配置未確認':'ch未確認')+')'}
 function trackAudio(t){if(!t?.audioCodec)return '取得不可';return audio(t.audioCodec,t.channelsCount)}
 function video(){return [...document.querySelectorAll('video')].find(v=>v.videoWidth&&v.videoHeight)||document.querySelector('video')}
 function mount(){
+ if(!enabled){document.querySelectorAll('.'+CLS).forEach(e=>e.remove());return}
  if(!location.pathname.startsWith('/play/')){document.querySelectorAll('.'+CLS).forEach(e=>e.remove());return}
  for(const btn of document.querySelectorAll('[data-testid="player-setting-show"]')){
   const parent=btn.parentElement;if(!parent||parent.nextElementSibling?.classList.contains(CLS))continue;
@@ -29,9 +30,9 @@ function draw(){
  const text='映像 '+q(w,h)+' · 音声 '+(identified||(mseAudio()||'取得不可'));
  for(const el of document.querySelectorAll('.'+CLS))el.textContent=text;
 }
-async function reinject(){try{await chrome.runtime.sendMessage({type:'PLAYBACK_HOOK'})}catch{}}
+async function reinject(){if(!enabled)return;try{await chrome.runtime.sendMessage({type:'PLAYBACK_HOOK'})}catch{}}
 function query(){
- if(!location.pathname.startsWith('/play/'))return;
+ if(!enabled||!location.pathname.startsWith('/play/'))return;
  mount();if(waiting)return;waiting=true;
  const id=++serial;let finished=false;
  function done(){if(finished)return;finished=true;waiting=false;clearTimeout(timer);window.removeEventListener('message',reply)}
@@ -39,8 +40,11 @@ function query(){
  const timer=setTimeout(()=>{done();if(!lastReply||Date.now()-lastReply>6000)reinject();draw()},2000);
  window.addEventListener('message',reply);window.postMessage({source:'UAI_PLAYBACK_REQUEST',id},location.origin);
 }
+function setEnabled(next){const was=enabled;enabled=next;if(!enabled){last=null;lastReply=0;document.querySelectorAll('.'+CLS).forEach(e=>e.remove())}else if(!was){last=null;lastReply=0;reinject();query()}}
+chrome.runtime.onMessage.addListener(m=>{if(m?.type==='UAI_ENABLED_CHANGED')setEnabled(m.enabled!==false)});
+chrome.runtime.sendMessage({type:'UAI_GET_ENABLED'}).then(r=>setEnabled(r?.enabled!==false)).catch(()=>{});
 let scheduled=false;
 new MutationObserver(()=>{if(scheduled)return;scheduled=true;setTimeout(()=>{scheduled=false;mount()},350)}).observe(document.documentElement,{childList:true,subtree:true});
-setInterval(()=>{if(lastPath!==location.pathname){lastPath=location.pathname;last=null;lastReply=0}query()},2500);
+setInterval(()=>{if(!enabled)return;if(lastPath!==location.pathname){lastPath=location.pathname;last=null;lastReply=0}query()},2500);
 reinject();setTimeout(query,500);
 })();
