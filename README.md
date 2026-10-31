@@ -57,3 +57,7 @@ Cookie・認証トークン・署名付きURL・HAR・個人情報をIssueや公
 - DRMやブラウザAPIの判定に失敗した組み合わせは「確認できません」とし、非対応と断定しません。
 - Dolby AtmosのJOC信号の可否はMediaCapabilitiesで直接判定できません。EC-3対応とAtmos対応を混同しません。
 - 作品カードからブラウザ能力を調べるだけで、再生ページへの移動・DRM回避・再生設定変更はしません。
+
+## U-NEXT公式ヘルプへのリンク（v0.4.1）
+
+作品カードの音声欄に[Dolby Audio / Dolby Atmosの公式案内](https://help.unext.jp/guide/detail/what-is-dolby-audio-and-dolby-atmos)、画質欄に[4Kの公式案内](https://help.unext.jp/guide/detail/what-is-4k)を設置。両リンクは別タブで開きます。
