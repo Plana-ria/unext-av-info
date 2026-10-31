@@ -20,8 +20,40 @@ let ac=r.querySelector('AudioChannelConfiguration')||set.querySelector('AudioCha
 aud.push({c,channels,config:conf,bitrate:+base||0,rate:attrs(r,'audioSamplingRate')||attrs(set,'audioSamplingRate')||'',representation:r,adaptation:set})}}
 const mpdAtmos=[...d.querySelectorAll('SupplementalProperty,EssentialProperty')].some(p=>/EC3_ExtensionType/i.test(p.getAttribute('schemeIdUri')||'')&&/JOC/i.test(p.getAttribute('value')||''));return{aud,vid,mpdAtmos,d}}
 function parseDec3(bytes){for(let i=0;i+12<bytes.length;i++){if(bytes[i+4]!==100||bytes[i+5]!==101||bytes[i+6]!==99||bytes[i+7]!==51)continue;const n=(bytes[i]*16777216+bytes[i+1]*65536+bytes[i+2]*256+bytes[i+3])>>>0;if(n<8||i+n>bytes.length)continue;const p=bytes.slice(i+8,i+n);const hex=[...p].map(v=>v.toString(16).padStart(2,'0')).join(' ');return {hex,atmos:p.length>=7&&p[p.length-2]===1&&p[p.length-1]>0,bytes:p.length}}return null}
-async function checkInit(parsed,mpdUrl){const results=[];for(const t of parsed.aud.filter(t=>/ec-3/i.test(t.c)).slice(0,2)){try{const segment=t.representation.querySelector('SegmentTemplate')||t.adaptation.querySelector('SegmentTemplate')||parsed.d.querySelector('SegmentTemplate');let rel=segment?.getAttribute('initialization');if(!rel){results.push('EC-3: 初期化セグメントの指定なし');continue}
-rel=rel.replace(/\$RepresentationID\$/g,t.representation.getAttribute('id')||'').replace(/\$Bandwidth\$/g,String(t.bitrate));let base=t.representation.querySelector('BaseURL')?.textContent||t.adaptation.querySelector('BaseURL')?.textContent||parsed.d.querySelector('BaseURL')?.textContent||'';const url=new URL(rel,new URL(base||'.',mpdUrl)).href;const r=await chrome.runtime.sendMessage({type:'FETCH',url,range:'bytes=0-65535'});if(r?.error)throw Error(r.error);const bin=atob(r.base64||'');const bytes=Uint8Array.from(bin,c=>c.charCodeAt(0));const box=parseDec3(bytes);results.push(box?'dec3: '+box.hex+(box.atmos?' / Atmos拡張フラグを検出':' / Atmos識別未確認'):'dec3未検出');if(box?.atmos)return {atmos:true,details:results.join('\n')}}catch(e){results.push('初期化セグメント取得: '+String(e.message||e).slice(0,100))}}return{atmos:false,details:results.join('\n')||'初期化情報なし'}}
+async function checkInit(parsed,mpdUrl){
+const direct=(n,name)=>[...n?.children||[]].find(x=>x.localName===name);
+const list=[];
+for(const t of parsed.aud.filter(t=>/ec-3/i.test(t.c)).slice(0,2)){
+ try{
+  const r=t.representation,adapt=t.adaptation;
+  let base=mpdUrl;
+  for(const n of [parsed.d.documentElement,direct(parsed.d.documentElement,'Period'),adapt,r]){
+    const u=direct(n,'BaseURL')?.textContent?.trim();if(u)base=new URL(u,base).href;
+  }
+  const templ=direct(r,'SegmentTemplate')||direct(adapt,'SegmentTemplate');
+  const sb=direct(r,'SegmentBase')||direct(adapt,'SegmentBase');
+  let rel=templ?.getAttribute('initialization'),range='bytes=0-262143';
+  if(rel){
+    rel=rel.replace(/\$RepresentationID\$/g,r.getAttribute('id')||'').replace(/\$Bandwidth\$/g,r.getAttribute('bandwidth')||'');
+    if(/\$[^$]+\$/.test(rel))throw Error('初期化セグメント変数の解決に失敗');
+  }else{
+    const init=direct(sb,'Initialization');
+    if(!init)throw Error('初期化セグメントの記述なし');
+    rel=init.getAttribute('sourceURL')||'';
+    const raw=init.getAttribute('range');
+    if(raw&&/^\d+-\d+$/.test(raw)){let [x,y]=raw.split('-').map(Number);range='bytes='+x+'-'+Math.min(y,x+262143);}
+  }
+  const url=new URL(rel||'',base);
+  const response=await chrome.runtime.sendMessage({type:'FETCH',url:url.href,range});
+  if(response?.error)throw Error(response.error);
+  const bin=atob(response.base64||''),bytes=Uint8Array.from(bin,x=>x.charCodeAt(0));
+  const box=parseDec3(bytes);
+  list.push(box?'dec3: '+box.hex+(box.atmos?' / Atmos拡張フラグあり':' / Atmos識別未確認'):'dec3未検出');
+  if(box?.atmos)return {atmos:true,details:list.join('\n')};
+ }catch(e){list.push('初期化セグメント: '+String(e.message||e).slice(0,160));}
+}
+return {atmos:false,details:list.join('\n')||'初期化情報なし'};
+}
 async function run(){const id=++runId;busy=true;render('照会中','確認中','音声情報を取得中','確認中','画質情報を取得中','配信情報を解析しています。','');
 const fail=e=>{if(id!==runId)return;busy=false;render('取得失敗','判定不能','音声情報を取得できませんでした','判定不能','画質情報を取得できませんでした',String(e.message||e),'エラー: '+String(e.message||e))};
 try{const injected=await chrome.runtime.sendMessage({type:'INJECT'});if(injected?.error)throw Error(injected.error);
