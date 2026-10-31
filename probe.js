@@ -2,7 +2,7 @@
 
 // Track title IDs passed through GraphQL POST requests during SPA navigation.
 // Capture only public title identifiers; never store credentials or response bodies.
-let observedTitle=null,observedRoute=null;
+let observedTitle=null,observedRoute=null,extensionEnabled=false;
 function recordTitle(source){
  try{
   const items=Array.isArray(source)?source:[source];
@@ -48,7 +48,7 @@ XMLHttpRequest.prototype.send=function(body){
  return originalSend.apply(this,arguments);
 };
 window.addEventListener('message',e=>{
- if(e.source!==window||e.data?.source!=='UAI_GET_TITLE')return;
+ if(e.source!==window||e.data?.source!=='UAI_GET_TITLE'||!extensionEnabled)return;
  if(e.data.fresh&&observedRoute!==location.href){observedTitle=null;observedRoute=null}
  if(observedTitle)window.postMessage({source:'UAI_TITLE_FOUND',title:observedTitle},location.origin);
 });
@@ -60,11 +60,14 @@ async function query(op,variables,hash,signal){const r=route(),u=new URL('https:
 const version=(window.__NEXT_DATA__?.props?.pageProps?._sentryBaggage?.match(/sentry-release=([^,]+)/)?.[1]||'v130.1-prod-102c043').replace(/[^\w.-]/g,'');
 const response=await fetch(u.href,{credentials:'include',signal,headers:{accept:'*/*','content-type':'application/json','apollographql-client-name':'cosmo','apollographql-client-version':version}});if(!response.ok)throw Error(op+' HTTP '+response.status);const body=await response.json();if(body.errors?.length)throw Error(op+': '+body.errors.map(e=>e.message).join('; ').slice(0,150));return body.data}
 const activeQueries=new Map();
+window.addEventListener('message',e=>{if(e.source!==window||e.data?.source!=='UAI_SET_ENABLED')return;extensionEnabled=e.data.enabled===true;if(!extensionEnabled){for(const controller of activeQueries.values())controller.abort();activeQueries.clear()}});
 window.addEventListener('message',e=>{if(e.source!==window||e.data?.source!=='UAI_CANCEL_QUERY')return;const id=String(e.data.id||'');for(const [key,controller] of activeQueries){if(key.startsWith(id+'-')){controller.abort();activeQueries.delete(key)}}});
-window.addEventListener('message',async e=>{const m=e.data;if(e.source!==window||m?.source!=='UAI_QUERY')return;const id=m.id;const controller=new AbortController();activeQueries.set(String(id),controller);const send=data=>window.postMessage({source:'UAI_RESULT',id,data},location.origin);
+window.addEventListener('message',async e=>{const m=e.data;if(e.source!==window||m?.source!=='UAI_QUERY'||!extensionEnabled)return;const id=m.id;const controller=new AbortController();activeQueries.set(String(id),controller);const send=data=>window.postMessage({source:'UAI_RESULT',id,data},location.origin);
 try{const title=m.title;if(!/^SID\d+$/.test(title||''))throw Error('作品IDを検出できません');
-const requestUrl=location.href;const stillCurrent=()=>location.href===requestUrl;
+const requestUrl=location.href;const stillCurrent=()=>extensionEnabled&&!controller.signal.aborted&&location.href===requestUrl;
+if(!stillCurrent())return;
 let ep=location.pathname.match(/ED\d+/)?.[0];if(!ep){const x=await query('cosmo_getVideoTitleEpisodes',{code:title,page:1,pageSize:20},hashes.episodes,controller.signal);if(!stillCurrent())return;ep=x?.webfront_title_titleEpisodes?.episodes?.[0]?.id;}
+if(!stillCurrent())return;
 if(!ep)throw Error('エピソードIDを取得できません');
 const x=await query('cosmo_getPlaylistUrl',{code:ep,playMode:'caption',bitrateLow:1500,bitrateHigh:null,validationOnly:false},hashes.playlist,controller.signal),info=x?.webfront_playlistUrl;if(!info)throw Error('プレイリスト情報がありません');
 if(!stillCurrent())return;
