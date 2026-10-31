@@ -16,8 +16,8 @@ function mount(){
   }
   el.querySelector('[data-uai-cell="video-head"]').textContent='映像';
   el.querySelector('[data-uai-cell="audio-head"]').textContent='音声';
-  el.querySelector('[data-uai-cell="current-label"]').textContent='現在';
-  el.querySelector('[data-uai-cell="highest-label"]').textContent='最高';
+  el.querySelector('[data-uai-cell="current-label"]').textContent='現在品質';
+  el.querySelector('[data-uai-cell="highest-label"]').textContent='最高品質';
   parent.after(el);
  }
  draw();
