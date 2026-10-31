@@ -130,10 +130,20 @@ render('解析完了',audioMain,audioSub,videoMain,videoSub,capability.note,deta
 busy=false;return;
 }catch(e){last=e}}throw last||Error('MPD解析失敗')}
 catch(e){fail(e)}}
-function attach(){const target=anchor(),title=sid();if(!target||!title){document.getElementById(ID)?.remove();current='';return}
-let host=document.getElementById(ID);const fresh=!host;if(!host)host=card();if(host.nextElementSibling!==target||host.parentElement!==target.parentElement)target.before(host);
-const key=title+'|'+location.pathname;if(key!==current||fresh){current=key;run()}}
+function attach(){
+ const target=anchor();
+ if(!target){document.getElementById(ID)?.remove();current='';return}
+ let host=document.getElementById(ID);const fresh=!host;if(!host)host=card();
+ if(host.nextElementSibling!==target||host.parentElement!==target.parentElement)target.before(host);
+ const title=sid();
+ if(!title){
+  if(current!=='waiting'){current='waiting';render('準備中','確認中','作品情報を待っています','確認中','作品情報を待っています','作品情報の読み込みを待っています。','')}
+  return;
+ }
+ const key=title+'|'+location.pathname;
+ if(key!==current||fresh){current=key;run()}
+}
 let pending=false;function schedule(){if(pending)return;pending=true;setTimeout(()=>{pending=false;attach()},300)}
 new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true});
-setInterval(()=>{if(lastUrl!==location.href){lastUrl=location.href;current='';schedule()}else if(anchor()&&sid()&&!document.getElementById(ID))schedule()},700);
+setInterval(()=>{if(lastUrl!==location.href){lastUrl=location.href;current='';schedule()}else if(anchor()&&(!sid()||!document.getElementById(ID)))schedule()},700);
 schedule()})();
