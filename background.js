@@ -9,13 +9,20 @@ chrome.runtime.onMessage.addListener((m,s,send)=>{
     if(u.protocol!=='https:'|| !(/(^|\.)(unext\.jp|nxtv\.jp)$/.test(u.hostname)))throw Error('取得先ホストが許可されていません');
     const init=m.range&&/^bytes=\d+-\d+$/.test(m.range);
     const headers=init?{Range:m.range}:{};
-    const r=await fetch(u.href,{credentials:'omit',cache:'no-store',headers});
-    if(!r.ok)throw Error('HTTP '+r.status);
+    const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),12000);
+    let r;try{r=await fetch(u.href,{credentials:'omit',cache:'no-store',headers,redirect:'error',signal:controller.signal});}catch(e){clearTimeout(timeout);throw e}
+    if(!r.ok){clearTimeout(timeout);throw Error('HTTP '+r.status)}
+    const limit=init?524288:3000000;
+    const length=Number(r.headers.get('content-length'));
+    if(length>limit){clearTimeout(timeout);throw Error('取得データの上限超過')}
+    const reader=r.body?.getReader();let parts=[],size=0;
+    if(reader){try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>limit)throw Error('取得データの上限超過');parts.push(value)}}finally{clearTimeout(timeout);reader.releaseLock()}}
+    else {try{const b=await r.arrayBuffer();size=b.byteLength;if(size>limit)throw Error('取得データの上限超過');parts=[new Uint8Array(b)]}finally{clearTimeout(timeout)}}
+    const bytes=new Uint8Array(size);let offset=0;for(const part of parts){bytes.set(part,offset);offset+=part.byteLength}
     if(init){
       if(r.status!==206&&Number(m.range.slice(6).split('-')[0])>0)throw Error('Range応答がありません');
-      const b=await r.arrayBuffer();if(b.byteLength>524288)throw Error('初期化データの上限超過');
-      const a=new Uint8Array(b);let str='';for(let i=0;i<a.length;i+=8192)str+=String.fromCharCode(...a.subarray(i,i+8192));send({base64:btoa(str)});
-    }else{const t=await r.text();if(t.length>3000000)throw Error('MPDサイズ超過');send({text:t});}
+      const a=bytes;let str='';for(let i=0;i<a.length;i+=8192)str+=String.fromCharCode(...a.subarray(i,i+8192));send({base64:btoa(str)});
+    }else{send({text:new TextDecoder().decode(bytes)});}
    }catch(e){send({error:e.message});}
   })();return true;
  }
