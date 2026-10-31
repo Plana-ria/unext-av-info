@@ -1,5 +1,47 @@
 (()=>{if(window.__uaiPlaybackHook)return;window.__uaiPlaybackHook=true;
 let player=null;
+let observedManifest=null,manifestPage=location.href;
+function parseManifest(xml){
+ try{
+  if(typeof xml!=='string'||xml.length>3000000||!/<MPD[\s>]/i.test(xml))return;
+  const doc=new DOMParser().parseFromString(xml,'application/xml');
+  if(doc.querySelector('parsererror'))return;
+  const video=[],audio=[];
+  for(const ad of doc.querySelectorAll('AdaptationSet')){
+   const mime=ad.getAttribute('mimeType')||'',kind=ad.getAttribute('contentType')||'';
+   for(const rep of ad.querySelectorAll('Representation')){
+    const codec=rep.getAttribute('codecs')||ad.getAttribute('codecs')||'';
+    const width=Number(rep.getAttribute('width')||ad.getAttribute('width'))||0,height=Number(rep.getAttribute('height')||ad.getAttribute('height'))||0;
+    const channelsNode=rep.querySelector('AudioChannelConfiguration')||ad.querySelector('AudioChannelConfiguration');
+    const channels=Number(channelsNode?.getAttribute('value'))||0;
+    if(kind==='video'||mime.startsWith('video/')||width&&height)video.push({width,height,codec});
+    else if(kind==='audio'||mime.startsWith('audio/')||/^(ec-3|ac-3|mp4a)/i.test(codec))audio.push({codec,channels});
+   }
+  }
+  if(video.length||audio.length)observedManifest={video,audio};
+ }catch{}
+}
+function inspectManifestUrl(url){try{return /\\.mpd(?:[?#]|$)/i.test(new URL(url,location.href).href)}catch{return false}}
+const nativeFetch=window.fetch;
+if(typeof nativeFetch==='function'){
+ window.fetch=function(...args){
+  const result=nativeFetch.apply(this,args);
+  try{const url=typeof args[0]==='string'?args[0]:args[0]?.url;if(inspectManifestUrl(url))result.then(r=>{if(r.ok)r.clone().text().then(parseManifest).catch(()=>{})}).catch(()=>{})}catch{}
+  return result;
+ };
+}
+const xhrOpen=XMLHttpRequest.prototype.open,xhrSend=XMLHttpRequest.prototype.send;
+XMLHttpRequest.prototype.open=function(method,url){this.__uaiManifestUrl=inspectManifestUrl(url);return xhrOpen.apply(this,arguments)};
+XMLHttpRequest.prototype.send=function(){
+ if(this.__uaiManifestUrl)this.addEventListener('load',()=>{
+  try{if(this.status>=200&&this.status<300){
+   if(typeof this.responseText==='string')parseManifest(this.responseText);
+   else if(this.response instanceof ArrayBuffer)parseManifest(new TextDecoder().decode(this.response));
+  }}catch{}
+ },{once:true});
+ return xhrSend.apply(this,arguments);
+};
+
 const mse={sourceBuffers:[],appendCount:0,errors:[],hooked:false};
 function sniff(x){
  const entries=[];
@@ -44,13 +86,14 @@ function watch(){install();const p=window.shaka?.Player?.prototype;if(!p||p.__ua
 const t=setInterval(watch,200);setTimeout(()=>clearInterval(t),90000);
 window.addEventListener('message',e=>{
  if(e.source!==window||e.data?.source!=='UAI_PLAYBACK_REQUEST')return;
- watch();const v=document.querySelector('video');
+ watch();if(manifestPage!==location.href){manifestPage=location.href;observedManifest=null}const v=document.querySelector('video');
  let track=null,stats=null,variants=[];
  try{if(player){variants=player.getVariantTracks?.()||[];track=variants.find(x=>x.active)||null;stats=player.getStats?.()||null}}catch{}
  window.postMessage({source:'UAI_PLAYBACK_RESULT',id:e.data.id,data:{
   video:v?{width:v.videoWidth,height:v.videoHeight,readyState:v.readyState}:null,
   track:track?{width:track.width,height:track.height,audioCodec:track.audioCodec,channelsCount:track.channelsCount}:null,
   stats:stats?{width:stats.width,height:stats.height}:null,
+  manifest:observedManifest,
   variants:variants.map(x=>({width:x.width,height:x.height,audioCodec:x.audioCodec,videoCodec:x.videoCodec,channelsCount:x.channelsCount,bandwidth:x.bandwidth,allowedByApplication:x.allowedByApplication,allowedByKeySystem:x.allowedByKeySystem})),
   mse:{hooked:mse.hooked,sourceBuffers:mse.sourceBuffers.map(x=>({...x})),appendCount:mse.appendCount}
  }},location.origin);
