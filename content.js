@@ -84,12 +84,12 @@ function makeCapabilitiesConfig(v,a){return {
  audio:{robustness:'SW_SECURE_CRYPTO',encryptionScheme:'cenc'},
  video:{robustness:'SW_SECURE_CRYPTO',encryptionScheme:'cenc'}}
 }}
-async function checkPlaybackCapabilities(videos,audios,atmos){
+async function checkPlaybackCapabilities(videos,audios,atmos,groups){
  if(!navigator.mediaCapabilities?.decodingInfo)return {note:'この環境での再生対応判定は利用できません。最高品質での視聴にはU-NEXTの対応端末が必要になる場合があります。',detail:'MediaCapabilities API が利用できません'};
  if(!videos.length||!audios.length)return {note:'この環境での再生対応判定は確認できません。',detail:'音声または映像トラックが取得できません'};
  const combinations=[];
  const results=[];
- for(const v of videos)for(const a of audios){
+ for(const group of groups||[{vid:videos,aud:audios}])for(const v of group.vid)for(const a of group.aud){
   if(!channelCount(a)||!v.w||!v.h||!v.c||!a.c)results.push({v,a,state:'unknown'});
   else combinations.push({v,a});
  }
@@ -160,20 +160,46 @@ for(let attempt=0;attempt<2;attempt++){
   await new Promise(resolve=>setTimeout(resolve,900));
  }
 }
-if(!valid())return;if(data.title&&data.title!==title)throw Error('作品IDが一致しません');if(data.error)throw Error(data.error);if(!data.mpds?.length)throw Error('MPD URLを取得できませんでした');let last;
-for(const url of data.mpds){try{const r=await chrome.runtime.sendMessage({type:'FETCH',url});if(r?.error)throw Error(r.error);const parsed=mpdParse(r.text);if(!parsed.aud.length&&!parsed.vid.length)throw Error('MPDに映像・音声情報がありません');
-const init=await checkInit(parsed,url);if(!valid())return;setOfficialHelpLinks(parsed);
-const aud=parsed.aud.sort((a,b)=>channelCount(b)-channelCount(a)||(/ec-3/i.test(b.c)?1:0)-(/ec-3/i.test(a.c)?1:0)||b.bitrate-a.bitrate),a=aud[0],best=parsed.vid.sort((a,b)=>b.w*b.h-a.w*a.h)[0];
-const atmos=parsed.mpdAtmos||init.atmos;const audioMain=atmos?'Dolby Atmos':a?channel(a):'不明',audioSub=a?codec(a.c):'音声情報なし';
-const videoMain=!best?'不明':best.h>=2160?'4K UHD':best.h>=1080?'Full HD':best.h>=720?'HD':best.h+'p',videoSub=best?best.w+'×'+best.h+' / '+codec(best.c):'映像情報なし';
-const note='この環境での再生対応状況を確認中です。';
-const detail='作品: '+data.title+' / '+data.ep+'\nAtmos(MPD): '+(parsed.mpdAtmos?'検出':'未確認')+'\n'+init.details+'\n音声:\n'+aud.map(t=>codec(t.c)+' / '+channel(t)+' / '+t.bitrate+'bps / '+t.rate+'Hz').join('\n')+'\n映像:\n'+parsed.vid.map(t=>t.w+'×'+t.h+' / '+codec(t.c)+' / '+t.bitrate+'bps').join('\n')+'\n※MPDにある配信候補であり、実際の再生形式は端末によります。';
-render('解析完了',audioMain,audioSub,videoMain,videoSub,note,detail);
-const capability=await checkPlaybackCapabilities(parsed.vid,parsed.aud,atmos);
+if(!valid())return;
+if(data.title&&data.title!==title)throw Error('作品IDが一致しません');
+if(data.error)throw Error(data.error);
+if(!data.mpds?.length)throw Error('MPD URLを取得できませんでした');
+const groups=[],failures=[];
+for(const url of data.mpds){
+ if(!valid())return;
+ try{
+  const response=await chrome.runtime.sendMessage({type:'FETCH',url});
+  if(!valid())return;
+  if(response?.error)throw Error(response.error);
+  const parsed=mpdParse(response.text);
+  if(!parsed.aud.length&&!parsed.vid.length)throw Error('MPDに映像・音声情報がありません');
+  const init=await checkInit(parsed,url);
+  if(!valid())return;
+  groups.push({parsed,init});
+ }catch(error){failures.push(describeError(error).detail)}
+}
+if(!valid())return;
+if(!groups.length)throw Error(failures[0]||'MPD解析失敗');
+const aud=groups.flatMap(g=>g.parsed.aud).sort((a,b)=>channelCount(b)-channelCount(a)||(/ec-3/i.test(b.c)?1:0)-(/ec-3/i.test(a.c)?1:0)||b.bitrate-a.bitrate);
+const vid=groups.flatMap(g=>g.parsed.vid).sort((a,b)=>b.w*b.h-a.w*a.h||b.bitrate-a.bitrate);
+const atmos=groups.some(g=>g.parsed.mpdAtmos||g.init.atmos);
+const a=aud[0],best=vid[0];
+setOfficialHelpLinks({aud,vid});
+const audioMain=atmos?'Dolby Atmos':a?channel(a):'不明',audioSub=a?codec(a.c):'音声情報なし';
+const videoMain=!best?'不明':videoLabel(best),videoSub=best?best.w+'×'+best.h+' / '+codec(best.c):'映像情報なし';
+const detail='作品: '+data.title+' / '+data.ep+'\n'+
+ 'MPD解析: '+groups.length+'件成功 / '+failures.length+'件失敗\n'+
+ 'Atmos: '+(atmos?'検出':'未確認')+'\n'+groups.map((g,i)=>'MPD '+(i+1)+': '+g.init.details).join('\n')+
+ '\n音声:\n'+aud.map(t=>codec(t.c)+' / '+channel(t)+' / '+t.bitrate+'bps / '+t.rate+'Hz').join('\n')+
+ '\n映像:\n'+vid.map(t=>t.w+'×'+t.h+' / '+codec(t.c)+' / '+t.bitrate+'bps').join('\n')+
+ (failures.length?'\n取得失敗: '+failures.join('; '):'')+
+ '\n※MPDにある配信候補であり、実際の再生形式は端末によります。';
+render('解析完了',audioMain,audioSub,videoMain,videoSub,'この環境での再生対応状況を確認中です。',detail);
+const capability=await checkPlaybackCapabilities(vid,aud,atmos,groups.map(g=>({vid:g.parsed.vid,aud:g.parsed.aud})));
 if(!valid())return;
 render('解析完了',audioMain,audioSub,videoMain,videoSub,capability.note,detail+'\n再生対応判定: '+capability.detail);
-busy=false;return;
-}catch(e){last=e}}throw last||Error('MPD解析失敗')}
+busy=false;
+}
 catch(e){fail(e)}}
 function attach(){
  const target=anchor();
