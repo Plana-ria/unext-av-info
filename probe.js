@@ -1,4 +1,55 @@
 (()=>{if(window.__unextAvProbeLoaded)return;window.__unextAvProbeLoaded=true;
+
+// Track title IDs passed through GraphQL POST requests during SPA navigation.
+// Capture only public title identifiers; never store credentials or response bodies.
+let observedTitle=null;
+function recordTitle(source){
+ try{
+  const items=Array.isArray(source)?source:[source];
+  for(const item of items){
+   if(!item||typeof item!=='object')continue;
+   const op=String(item.operationName||'');
+   if(!['cosmo_getVideoTitle','cosmo_getVideoTitleEpisodes','cosmo_getVideoTitleRelatedStuffs'].includes(op))continue;
+   const code=item.variables?.code;
+   if(typeof code==='string'&&/^SID\\d+$/.test(code)){
+    observedTitle=code;
+    window.postMessage({source:'UAI_TITLE_FOUND',title:code},location.origin);
+   }
+  }
+ }catch{}
+}
+function inspectBody(body){
+ try{
+  if(typeof body==='string'){recordTitle(JSON.parse(body));return}
+  if(body instanceof URLSearchParams){const op=body.get('operationName');recordTitle({operationName:op,variables:JSON.parse(body.get('variables')||'{}')});}
+ }catch{}
+}
+function inspectRequest(url,body){
+ try{
+  const u=new URL(typeof url==='string'?url:url?.url||'',location.href);
+  if(u.hostname!=='cc.unext.jp')return;
+  const op=u.searchParams.get('operationName');
+  if(op)recordTitle({operationName:op,variables:JSON.parse(u.searchParams.get('variables')||'{}')});
+  inspectBody(body);
+ }catch{}
+}
+const originalFetch=window.fetch;
+if(typeof originalFetch==='function')window.fetch=function(input,init){
+ try{inspectRequest(input,init?.body??(input instanceof Request?input:null));}catch{}
+ return originalFetch.apply(this,arguments);
+};
+const originalOpen=XMLHttpRequest.prototype.open,originalSend=XMLHttpRequest.prototype.send;
+XMLHttpRequest.prototype.open=function(method,url){
+ try{this.__uaiRequestUrl=String(url);inspectRequest(url,null);}catch{}
+ return originalOpen.apply(this,arguments);
+};
+XMLHttpRequest.prototype.send=function(body){
+ try{inspectRequest(this.__uaiRequestUrl,body);}catch{}
+ return originalSend.apply(this,arguments);
+};
+window.addEventListener('message',e=>{
+ if(e.source===window&&e.data?.source==='UAI_GET_TITLE'&&observedTitle)window.postMessage({source:'UAI_TITLE_FOUND',title:observedTitle},location.origin);
+});
 const hashes={episodes:'8bc4fa1b6e96812ac7836912a04eb511616511b10a25da8447d2afd389fd39dc',playlist:'a2309e22a6819ff747cf9a389dd78db35fa3c386fac1d53461061ba20fa44e34'};
 function entries(){return performance.getEntriesByType('resource').map(e=>e.name)}
 function route(){for(const name of entries().slice().reverse()){try{let u=new URL(name);if(u.hostname==='cc.unext.jp'&&u.searchParams.get('zxuid')&&u.searchParams.get('zxemp'))return {uid:u.searchParams.get('zxuid'),emp:u.searchParams.get('zxemp')}}catch{}}throw Error('API接続情報が取得できません。ページを再読み込みしてください')}
