@@ -123,10 +123,41 @@ async function checkPlaybackCapabilities(videos,audios,atmos){
  }
  return {note:notices.join('\n'),detail:details};
 }
+function describeError(error){
+ const raw=String(error?.message||error||'取得失敗').slice(0,300);
+ const detail=raw.replace(/https?:\/\/[^\s]+/g,'[URL省略]').replace(/(?:play_token|token|zxuid|zxemp)=[^\s&]+/gi,'$1=[省略]');
+ if(/cosmo_getPlaylistUrl.*(?:HTTP 40[13]|forbidden|unauthori[sz]ed|access.denied|permission)/i.test(raw))
+  return {kind:'PLAYLIST_ACCESS',message:'この作品の配信情報を取得できません。（未購入のポイント作品の可能性があります）',detail,retry:false};
+ if(/(?:API応答タイムアウト|timed?\s*out)/i.test(raw))return {kind:'TIMEOUT',message:'応答がありません。再取得してください。',detail,retry:true};
+ if(/(?:HTTP (?:429|5\d\d))\b/i.test(raw))return {kind:'SERVER',message:'一時的に配信情報を取得できませんでした。再取得してください。',detail,retry:true};
+ if(/(?:Failed to fetch|NetworkError|network error|ネットワーク|通信エラー)/i.test(raw))return {kind:'NETWORK',message:'通信に失敗しました。接続を確認してください。',detail,retry:true};
+ if(/(?:MPD XML解析エラー|MPDに映像・音声情報がありません|MPD解析失敗)/i.test(raw))return {kind:'MPD_PARSE',message:'配信情報を解析できませんでした。',detail,retry:false};
+ if(/(?:HTTP 40[13]|MPD URLを取得できません|HTTP 404)/i.test(raw))return {kind:'FETCH',message:'配信情報の取得に失敗しました。再取得をお試しください。',detail,retry:false};
+ return {kind:'UNKNOWN',message:'配信情報の取得に失敗しました。再取得をお試しください。',detail,retry:false};
+}
+function requestTitleData(id,title,attempt){
+ return new Promise((resolve,reject)=>{
+  const requestId=id+'-'+attempt;
+  const timer=setTimeout(()=>{window.removeEventListener('message',handler);reject(Error('API応答タイムアウト'))},16000);
+  function handler(e){if(e.source!==window||e.data?.source!=='UAI_RESULT'||e.data.id!==requestId)return;clearTimeout(timer);window.removeEventListener('message',handler);resolve(e.data.data)}
+  window.addEventListener('message',handler);window.postMessage({source:'UAI_QUERY',id:requestId,title},location.origin);
+ });
+}
 async function run(title=sid()){if(!title)return;const id=++runId,requestUrl=location.href;const valid=()=>id===runId&&location.href===requestUrl&&sid()===title;busy=true;const links=rootOf()?.getElementById('official-links');if(links)links.hidden=true;render('照会中','確認中','音声情報を取得中','確認中','画質情報を取得中','配信情報を解析しています。','');
-const fail=e=>{if(!valid())return;busy=false;render('取得失敗','判定不能','音声情報を取得できませんでした','判定不能','画質情報を取得できませんでした',String(e.message||e),'エラー: '+String(e.message||e))};
+const fail=e=>{if(!valid())return;busy=false;const info=describeError(e);render('取得失敗','判定不能','音声情報を取得できませんでした','判定不能','画質情報を取得できませんでした',info.message,'エラー種別: '+info.kind+'\n'+info.detail)};
 try{const injected=await chrome.runtime.sendMessage({type:'INJECT'});if(injected?.error)throw Error(injected.error);
-const data=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{window.removeEventListener('message',handler);reject(Error('API応答タイムアウト'))},16000);function handler(e){if(e.source!==window||e.data?.source!=='UAI_RESULT'||e.data.id!==id)return;clearTimeout(timer);window.removeEventListener('message',handler);resolve(e.data.data)}window.addEventListener('message',handler);window.postMessage({source:'UAI_QUERY',id,title},location.origin)});
+let data;
+for(let attempt=0;attempt<2;attempt++){
+ try{
+  data=await requestTitleData(id,title,attempt);
+  if(data?.error)throw Error(data.error);
+  break;
+ }catch(error){
+  if(!valid())return;
+  if(attempt>0||!describeError(error).retry)throw error;
+  await new Promise(resolve=>setTimeout(resolve,900));
+ }
+}
 if(!valid())return;if(data.title&&data.title!==title)throw Error('作品IDが一致しません');if(data.error)throw Error(data.error);if(!data.mpds?.length)throw Error('MPD URLを取得できませんでした');let last;
 for(const url of data.mpds){try{const r=await chrome.runtime.sendMessage({type:'FETCH',url});if(r?.error)throw Error(r.error);const parsed=mpdParse(r.text);if(!parsed.aud.length&&!parsed.vid.length)throw Error('MPDに映像・音声情報がありません');
 const init=await checkInit(parsed,url);if(!valid())return;setOfficialHelpLinks(parsed);
