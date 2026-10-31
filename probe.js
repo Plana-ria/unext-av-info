@@ -2,7 +2,7 @@
 
 // Track title IDs passed through GraphQL POST requests during SPA navigation.
 // Capture only public title identifiers; never store credentials or response bodies.
-let observedTitle=null;
+let observedTitle=null,observedRoute=null;
 function recordTitle(source){
  try{
   const items=Array.isArray(source)?source:[source];
@@ -12,7 +12,7 @@ function recordTitle(source){
    if(!['cosmo_getVideoTitle','cosmo_getVideoTitleEpisodes','cosmo_getVideoTitleRelatedStuffs'].includes(op))continue;
    const code=item.variables?.code;
    if(typeof code==='string'&&/^SID\d+$/.test(code)){
-    observedTitle=code;
+    observedTitle=code;observedRoute=location.href;
     window.postMessage({source:'UAI_TITLE_FOUND',title:code},location.origin);
    }
   }
@@ -49,7 +49,7 @@ XMLHttpRequest.prototype.send=function(body){
 };
 window.addEventListener('message',e=>{
  if(e.source!==window||e.data?.source!=='UAI_GET_TITLE')return;
- if(e.data.fresh){observedTitle=null;return}
+ if(e.data.fresh&&observedRoute!==location.href){observedTitle=null;observedRoute=null}
  if(observedTitle)window.postMessage({source:'UAI_TITLE_FOUND',title:observedTitle},location.origin);
 });
 const hashes={episodes:'8bc4fa1b6e96812ac7836912a04eb511616511b10a25da8447d2afd389fd39dc',playlist:'a2309e22a6819ff747cf9a389dd78db35fa3c386fac1d53461061ba20fa44e34'};
