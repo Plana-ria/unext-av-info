@@ -91,10 +91,10 @@ function draw(){
  const chMatch=originalHighestAudio.match(/\((\d+(?:\.\d+)?ch)(?:・[^)]*)?\)/);
  const isDolbyCodec=/Dolby Digital(?: Plus)?/.test(originalHighestAudio);
  const isAtmos=/^Dolby Atmos/.test(originalHighestAudio)||window.__uaiAtmosMatched?.()===true;
- const highestAudio=isAtmos?'Dolby Atmos':allowHistory&&isDolbyCodec&&chMatch?'Dolby Audio ('+chMatch[1]+') · '+originalHighestAudio.replace(/\s*\([^)]*\)/,''):window.__uaiDolbyAudioMatched?.()===true?(allowHistory&&chMatch?'Dolby Audio ('+chMatch[1]+')':'Dolby Audio'):originalHighestAudio;
+ const highestAudio=isAtmos?'Dolby Atmos':allowHistory&&isDolbyCodec&&chMatch?'Dolby Audio ('+chMatch[1]+' / '+originalHighestAudio.replace(/\s*\([^)]*\)/,'')+')':window.__uaiDolbyAudioMatched?.()===true?(allowHistory&&chMatch?'Dolby Audio ('+chMatch[1]+')':'Dolby Audio'):originalHighestAudio;
  for(const el of document.querySelectorAll('.'+CLS)){
   const currentCh=currentAudio.match(/\((\d+(?:\.\d+)?ch)(?:・[^)]*)?\)/);
-  const readableCurrent=allowHistory&&/Dolby Digital(?: Plus)?/.test(currentAudio)&&currentCh?'Dolby Audio ('+currentCh[1]+') · '+currentAudio.replace(/\s*\([^)]*\)/,''):currentAudio;
+  const readableCurrent=allowHistory&&/Dolby Digital(?: Plus)?/.test(currentAudio)&&currentCh?'Dolby Audio ('+currentCh[1]+' / '+currentAudio.replace(/\s*\([^)]*\)/,'')+')':currentAudio;
   const cells={currentVideo,currentAudio:readableCurrent,highestVideo,highestAudio};
   for(const [name,value] of Object.entries(cells)){
    const cell=el.querySelector('[data-uai-cell="'+name.replace(/[A-Z]/g,x=>'-'+x.toLowerCase())+'"]');
