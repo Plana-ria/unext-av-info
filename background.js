@@ -1,17 +1,22 @@
 
-// These radio items appear on the extension icon's right-click menu.
-const MENU_SAFE='uai-mode-safe',MENU_ALLOW='uai-mode-allow';
+// Fresh settings: legacy allowTitleAnalysis is deliberately ignored.
+const DEFAULTS={uaiShowTitle:true,uaiShowPlayback:true,uaiShowLists:true,uaiAllowHistory:false};
+const ITEMS=[['uaiShowTitle','作品ページの品質表示'],['uaiShowPlayback','再生ページの品質表示'],['uaiShowLists','検索結果・一覧ページでの品質表示']];
 async function installModeMenu(){
- const settings=await chrome.storage.local.get('allowTitleAnalysis');
+ const saved=await chrome.storage.local.get(Object.keys(DEFAULTS));
  await chrome.contextMenus.removeAll();
- chrome.contextMenus.create({id:MENU_SAFE,title:'作品ページではカードを表示しない（推奨）',type:'radio',contexts:['action'],checked:settings.allowTitleAnalysis!==true});
- chrome.contextMenus.create({id:MENU_ALLOW,title:'視聴履歴への追加を許容して自動解析',type:'radio',contexts:['action'],checked:settings.allowTitleAnalysis===true});
+ chrome.contextMenus.create({id:'uai-heading-views',title:'表示項目',contexts:['action'],enabled:false});
+ for(const [key,label] of ITEMS)chrome.contextMenus.create({id:key,title:label,type:'checkbox',contexts:['action'],checked:saved[key]!==false});
+ chrome.contextMenus.create({id:'uai-heading-history',title:'再生履歴への影響制御',contexts:['action'],enabled:false});
+ chrome.contextMenus.create({id:'uai-history-safe',title:'未再生の作品が再生履歴へ追加されることを許容しない（推奨）',type:'radio',contexts:['action'],checked:saved.uaiAllowHistory!==true});
+ chrome.contextMenus.create({id:'uai-history-allow',title:'未再生の作品が再生履歴へ追加されることを許容する',type:'radio',contexts:['action'],checked:saved.uaiAllowHistory===true});
 }
-chrome.runtime.onInstalled.addListener(()=>installModeMenu().catch(console.error));
+chrome.runtime.onInstalled.addListener(()=>{chrome.storage.local.remove('allowTitleAnalysis').catch(()=>{});installModeMenu().catch(console.error)});
 chrome.runtime.onStartup.addListener(()=>installModeMenu().catch(console.error));
 chrome.contextMenus.onClicked.addListener(async info=>{
- if(info.menuItemId!==MENU_SAFE&&info.menuItemId!==MENU_ALLOW)return;
- await chrome.storage.local.set({allowTitleAnalysis:info.menuItemId===MENU_ALLOW});
+ const key=ITEMS.find(([id])=>id===info.menuItemId)?.[0];
+ if(key)await chrome.storage.local.set({[key]:info.checked===true});
+ else if(info.menuItemId==='uai-history-safe'||info.menuItemId==='uai-history-allow')await chrome.storage.local.set({uaiAllowHistory:info.menuItemId==='uai-history-allow'});
 });
 // A single toolbar toggle is shared by all U-NEXT tabs and persisted across restarts.
 let enabled=false;
