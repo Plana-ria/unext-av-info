@@ -44,7 +44,7 @@ async function refresh(kind){
   if(!Array.isArray(ids)||!ids.length||new Set(ids).size!==ids.length||ids.some(x=>typeof x!=='string'||!/^SID\d+$/.test(x)))throw Error('作品一覧が不完全です');
   item.cache={ids,time:Date.now(),pages:result.pages};
   await chrome.storage.local.set({[specs[kind].key]:item.cache});
- }catch(e){console.warn('[U-NEXT AV Info] '+kind+' feature lookup:',String(e.message||e).slice(0,160))}
+ }catch(e){if(/API接続情報が取得できません/.test(String(e.message||e)))item.lastAttempt=Date.now()-(RETRY-30000);console.warn('[U-NEXT AV Info] '+kind+' feature lookup:',String(e.message||e).slice(0,160))}
  finally{item.inflight=false;paint()}
 }
 function start(){if(!enabled||!viewsReady||!showAny)return;refresh('dv');refresh('fourk');refresh('atmos');refresh('audio')}
