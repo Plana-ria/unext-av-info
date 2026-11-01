@@ -75,6 +75,20 @@ async function loadPlaylistHighest(){
  }finally{if(valid())playlistBusy=false}
 }
 
+// Only keep codec details if they describe the selected resolution tier.
+// An official 4K listing does not establish the codec of its 4K stream.
+function resolveHighestVideo(mpdVideo,{fourk,dv,hasPlaylist=true}){
+ const match=/^(4K UHD|Full HD|HD|\\d+p)(?:\\s*\\(([^)]*)\\))?$/.exec(mpdVideo);
+ const mpdTier=match?.[1]||null;
+ const officialUpgrade=fourk&&mpdTier!== '4K UHD';
+ let tier=officialUpgrade?'4K UHD':mpdTier;
+ if(!tier){
+  if(fourk)tier='4K UHD';
+  else return mpdVideo;
+ }
+ const codec=officialUpgrade?'':(match?.[2]||'');
+ return tier+(dv?' Dolby Vision':'')+(codec?' ('+codec+')':'');
+}
 function draw(){
  const v=video(),w=v?.videoWidth||last?.video?.width||last?.track?.width||last?.stats?.width,h=v?.videoHeight||last?.video?.height||last?.track?.height;
  const currentVideo=q(w,h),currentAudio=last?.track?.audioCodec?trackAudio(last.track):(mseAudio()||'取得不可');
@@ -83,10 +97,7 @@ function draw(){
  const index=highest?.indexOf(separator)??-1;
  const baseVideo=index>=0?highest.slice(0,index).replace(/^映像 /,''):'確認中';
  const fourk=window.__uai4kMatched?.()===true,dv=window.__uaiDvMatched?.()===true;
- const actual4k=/^4K UHD\b/.test(baseVideo);
- const enhanced=fourk&&!actual4k&&index>=0&&baseVideo!=='取得不可'&&baseVideo!=='確認中';
- const videoWith4k=enhanced?baseVideo.replace(/^(?:Full HD|HD|\d+p)/,'4K UHD'):baseVideo;
- const highestVideo=dv&&index>=0&&videoWith4k!=='取得不可'&&videoWith4k!=='確認中'?(videoWith4k.includes(' (')?videoWith4k.replace(' (',' Dolby Vision ('):videoWith4k+' Dolby Vision'):videoWith4k;
+ const highestVideo=resolveHighestVideo(baseVideo,{fourk,dv,hasPlaylist:index>=0});
  const originalHighestAudio=index>=0?highest.slice(index+separator.length):'確認中';
  const chMatch=originalHighestAudio.match(/\((\d+(?:\.\d+)?ch)(?:・[^)]*)?\)/);
  const isDolbyCodec=/Dolby Digital(?: Plus)?/.test(originalHighestAudio);
