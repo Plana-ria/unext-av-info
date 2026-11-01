@@ -2,26 +2,13 @@
 let enabled=true,visible=true,pending=false,lastLocation=location.href;
 const style=document.createElement('style');style.textContent='.uai-list-quality{padding:5px 2px 3px;color:#c9dae8;font:500 11px/1.45 system-ui,sans-serif;display:grid;gap:2px;max-width:100%;pointer-events:none}.uai-list-quality span{overflow-wrap:anywhere}';document.documentElement.append(style);
 const quality=id=>window.__uaiQualityForId?.(id)||{};
-function isListPage(){
- // The U-NEXT title detail overlay preserves /freeword or /browse and adds ?td=SID...
- // Treat every URL with a title-detail parameter as a detail page.
- if(new URL(location.href).searchParams.has('td'))return false;
- const path=location.pathname;
- // Opt in only on true discovery pages. Detail pages may use /browse/... routes,
- // so excluding only /title/SID... is not sufficient.
- if(path==='/'||/^\/(?:search|freeword|genre)(?:\/|$)/.test(path))return true;
- if(/^\/browse\/(?:feature|ranking|genre|category|list)(?:\/|$)/.test(path))return true;
- return false;
+function shouldShowListQuality(){
+ const url=new URL(location.href);
+ return !url.searchParams.has('td')&&!url.pathname.startsWith('/play/');
 }
 
-function episodeOverlayOpen(){
- // U-NEXT opens episode detail panels without necessarily changing the list URL.
- // The site locks body scrolling while the panel is open; hide list badges there.
- if(document.body?.style.overflow==='hidden'&&[...document.querySelectorAll('h1,h2,h3')].some(h=>/^エピソード(?:\s|$)/.test(h.textContent.trim())&&h.getClientRects().length))return true;
- return false;
-}
 function update(){
- if(!enabled||!visible||!isListPage()||episodeOverlayOpen()){document.querySelectorAll('.uai-list-quality').forEach(e=>e.remove());return}
+ if(!enabled||!visible||!shouldShowListQuality()){document.querySelectorAll('.uai-list-quality').forEach(e=>e.remove());return}
  const groups=new Map();
  for(const a of document.querySelectorAll('a[href*="SID"]')){
   const match=(a.getAttribute('href')||'').match(/^\/title\/(SID\d+)(?:\/)?(?:[?#]|$)/);if(!match)continue;
