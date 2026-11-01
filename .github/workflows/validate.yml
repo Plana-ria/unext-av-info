@@ -12,9 +12,30 @@ jobs:
           node-version: '22'
       - name: Check JavaScript syntax
         run: |
-          for file in background.js probe.js content.js playback-hook.js playback-ui.js; do
+          for file in *.js; do
             node --check "$file"
           done
       - name: Validate manifests
         run: |
-          node -e "const fs=require('node:fs');for(const f of ['manifest.json','manifest.firefox.json']){const m=JSON.parse(fs.readFileSync(f));if(m.manifest_version!==3||m.version!=='1.0.0')throw Error(f+' invalid manifest');if(f==='manifest.json'&&m.background.scripts)throw Error('Chromium manifest contains background.scripts');if(f.includes('firefox')&&!m.background.scripts)throw Error('Firefox manifest lacks background scripts');}"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const files = ['manifest.json', 'manifest.firefox.json'];
+          const manifests = files.map(file => JSON.parse(fs.readFileSync(file, 'utf8')));
+
+          for (const [index, manifest] of manifests.entries()) {
+            if (manifest.manifest_version !== 3 ||
+                !/^\d+\.\d+\.\d+$/.test(manifest.version)) {
+              throw Error(files[index] + ' invalid manifest');
+            }
+          }
+
+          if (manifests[0].version !== manifests[1].version) {
+            throw Error('Manifest versions do not match');
+          }
+          if (manifests[0].background.scripts) {
+            throw Error('Chromium manifest contains background.scripts');
+          }
+          if (!manifests[1].background.scripts) {
+            throw Error('Firefox manifest lacks background scripts');
+          }
+          NODE
