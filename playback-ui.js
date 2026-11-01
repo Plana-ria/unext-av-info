@@ -1,11 +1,11 @@
 (()=>{if(window.__uaiPlaybackUi)return;window.__uaiPlaybackUi=true;
-const CLS='uai-playback-info';let enabled=false,playlistHighest=null,playlistBusy=false,playlistKey='',playlistAttempts=0,playlistGeneration=0;let serial=0,waiting=false,last=null,lastReply=0,lastPath='';
+const CLS='uai-playback-info';let enabled=false,showPlayback=true,playlistHighest=null,playlistBusy=false,playlistKey='',playlistAttempts=0,playlistGeneration=0;let serial=0,waiting=false,last=null,lastReply=0,lastPath='';
 function q(w,h){return !w||!h?'取得不可':h>=2160?'4K UHD':h>=1080?'Full HD':h>=720?'HD':h+'p'}
 function audio(t,ch){const name=/ec-3/i.test(t)?'Dolby Digital Plus':/ac-3/i.test(t)?'Dolby Digital':/mp4a/i.test(t)?'AAC':'音声形式不明';return name+' ('+(ch===2?'2.0ch':ch===1?'1.0ch':ch===6?'5.1ch':ch?ch+'ch・配置未確認':'ch未確認')+')'}
 function trackAudio(t){if(!t?.audioCodec)return '取得不可';return audio(t.audioCodec,t.channelsCount)}
 function video(){return [...document.querySelectorAll('video')].find(v=>v.videoWidth&&v.videoHeight)||document.querySelector('video')}
 function mount(){
- if(!enabled){document.querySelectorAll('.'+CLS).forEach(e=>e.remove());return}
+ if(!enabled||!showPlayback){document.querySelectorAll('.'+CLS).forEach(e=>e.remove());return}
  if(!location.pathname.startsWith('/play/')){document.querySelectorAll('.'+CLS).forEach(e=>e.remove());return}
  for(const btn of document.querySelectorAll('[data-testid="player-setting-show"]')){
   const parent=btn.parentElement;if(!parent||parent.nextElementSibling?.classList.contains(CLS))continue;
@@ -40,7 +40,7 @@ function resetPlaylist(){
  playlistGeneration++;playlistBusy=false;playlistHighest=null;playlistKey='';playlistAttempts=0;
 }
 async function loadPlaylistHighest(){
- if(!enabled||!location.pathname.startsWith('/play/')||playlistBusy)return;
+ if(!enabled||!showPlayback||!location.pathname.startsWith('/play/')||playlistBusy)return;
  const key=location.href;
  if(playlistKey!==key){resetPlaylist();playlistKey=key}
  if(playlistHighest||playlistAttempts>=2)return;
@@ -88,7 +88,7 @@ function draw(){
  const videoWith4k=enhanced?baseVideo.replace(/^(?:Full HD|HD|\d+p)/,'4K UHD'):baseVideo;
  const highestVideo=dv&&index>=0&&videoWith4k!=='取得不可'&&videoWith4k!=='確認中'?(videoWith4k.includes(' (')?videoWith4k.replace(' (',' Dolby Vision ('):videoWith4k+' Dolby Vision'):videoWith4k;
  const originalHighestAudio=index>=0?highest.slice(index+separator.length):'確認中';
- const highestAudio=window.__uaiAtmosMatched?.()===true?'Dolby Atmos':originalHighestAudio;
+ const highestAudio=window.__uaiAtmosMatched?.()===true?'Dolby Atmos':window.__uaiDolbyAudioMatched?.()===true?'Dolby Audio':originalHighestAudio;
  for(const el of document.querySelectorAll('.'+CLS)){
   const cells={currentVideo,currentAudio,highestVideo,highestAudio};
   for(const [name,value] of Object.entries(cells)){
@@ -99,7 +99,7 @@ function draw(){
 }
 async function reinject(){if(!enabled)return;try{await chrome.runtime.sendMessage({type:'PLAYBACK_HOOK'})}catch{}}
 function query(){
- if(!enabled||!location.pathname.startsWith('/play/'))return;
+ if(!enabled||!showPlayback||!location.pathname.startsWith('/play/'))return;
  if(lastPath!==location.href){lastPath=location.href;resetPlaylist();last=null;lastReply=0}
  loadPlaylistHighest();
  mount();if(waiting)return;waiting=true;
@@ -111,6 +111,8 @@ function query(){
 }
 function setEnabled(next){const was=enabled;enabled=next;if(!enabled){resetPlaylist();last=null;lastReply=0;document.querySelectorAll('.'+CLS).forEach(e=>e.remove())}else if(!was){last=null;lastReply=0;reinject();query()}}
 chrome.runtime.onMessage.addListener(m=>{if(m?.type==='UAI_ENABLED_CHANGED')setEnabled(m.enabled!==false)});
+chrome.storage.local.get('uaiShowPlayback').then(x=>{showPlayback=x.uaiShowPlayback!==false;if(!showPlayback){resetPlaylist();document.querySelectorAll('.'+CLS).forEach(e=>e.remove())}else if(enabled)query()}).catch(()=>{});
+chrome.storage.onChanged.addListener((changes,area)=>{if(area==='local'&&changes.uaiShowPlayback){showPlayback=changes.uaiShowPlayback.newValue!==false;if(!showPlayback){resetPlaylist();document.querySelectorAll('.'+CLS).forEach(e=>e.remove())}else if(enabled)query()}});
 chrome.runtime.sendMessage({type:'UAI_GET_ENABLED'}).then(r=>setEnabled(r?.enabled!==false)).catch(()=>{});
 let scheduled=false;
 window.addEventListener('UAI_DV_UPDATED',draw);
