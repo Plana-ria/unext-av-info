@@ -1,11 +1,38 @@
 <!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>U-NEXT AV Info 設定</title>
-<style>body{font:16px/1.7 system-ui,-apple-system,sans-serif;max-width:670px;margin:40px auto;padding:0 20px;color:#222}h1{font-size:25px}fieldset{border:1px solid #ccc;border-radius:9px;padding:20px}label{display:block;margin:10px 0;cursor:pointer}input{margin-right:9px}p{margin:12px 0;color:#555}.warning{color:#a52c26;font-weight:700}#status{min-height:1.5em;color:#176341}</style>
-</head><body><h1>U-NEXT AV Info 設定</h1>
-<fieldset><legend>作品詳細ページでの解析</legend>
-<label><input type="radio" name="mode" value="safe">作品ページではカードを表示しない（推奨）</label>
-<label><input type="radio" name="mode" value="allow">視聴履歴への追加を許容して、作品ページで自動解析する</label>
-<p class="warning">自動解析では、動画を再生しなくてもU-NEXTの視聴履歴へ追加される可能性が高いです。</p>
-<p>どちらの設定でも、再生ページには「現在の品質」と、再生プレイヤーから取得可能な「最高品質」を表示します。最高品質が確認できない場合は「取得不可」と表示します。</p>
-</fieldset><p id="status" role="status"></p><script src="options.js"></script></body></html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>U-NEXT AV Info | 設定</title>
+<style>
+:root{color-scheme:light dark;font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif}
+*{box-sizing:border-box}
+body{max-width:740px;margin:48px auto;padding:0 24px;line-height:1.65}
+h1{font-size:1.6rem;margin:0 0 8px}
+.subtitle{margin:0 0 30px;color:CanvasText;opacity:.7}
+fieldset{border:1px solid color-mix(in srgb,CanvasText 20%,transparent);border-radius:12px;padding:18px 22px;margin:0 0 20px;min-width:0}
+legend{font-size:1.1rem;font-weight:700;padding:0 8px}
+label{display:flex;align-items:flex-start;gap:12px;padding:9px 0;cursor:pointer}
+input{width:19px;height:19px;flex:none;margin:4px 0 0;accent-color:#467fe1}
+.note{font-size:.9rem;opacity:.78;margin:12px 0 0}
+#status{min-height:1.5em;color:#287d4d;font-size:.9rem}
+@media(prefers-color-scheme:dark){#status{color:#8ddbb0}}
+</style>
+</head>
+<body>
+<h1>U-NEXT AV Info（非公式）</h1>
+<p class="subtitle">表示項目と再生履歴への影響を設定します。変更は自動保存されます。</p>
+<fieldset><legend>表示項目</legend>
+<label><input type="checkbox" id="uaiShowTitle">作品ページの品質表示</label>
+<label><input type="checkbox" id="uaiShowPlayback">再生ページの品質表示</label>
+<label><input type="checkbox" id="uaiShowLists">検索結果・一覧ページでの品質表示</label>
+</fieldset>
+<fieldset><legend>再生履歴への影響制御</legend>
+<label><input type="radio" name="history" value="safe">未再生の作品が再生履歴に追加されることを許容しない（推奨）</label>
+<label><input type="radio" name="history" value="allow">未再生の作品が再生履歴に追加されることを許容する</label>
+<p class="note">許容すると、作品情報の取得によって再生していない作品が視聴履歴に追加される可能性があります。</p>
+</fieldset>
+<p id="status" role="status" aria-live="polite"></p>
+<script src="options.js"></script>
+</body>
+</html>
