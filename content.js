@@ -235,7 +235,12 @@ const detail='作品: '+data.title+' / '+data.ep+'\n'+
 render('解析完了',audioMain,audioSub,videoMain,videoSub,'この環境での再生対応状況を確認中です。',detail);
 const capability=await checkPlaybackCapabilities(vid,aud,atmos,groups.map(g=>({vid:g.parsed.vid,aud:g.parsed.aud})));
 if(!valid())return;
-render('解析完了',audioMain,audioSub,videoMain,videoSub,capability.note,detail+'\n再生対応判定: '+capability.detail);
+const official4k=window.__uai4kMatched?.()===true;
+const mpd4k=vid.some(t=>t.w>=3840&&t.h>=2160);
+const needs4kCaution=official4k&&!mpd4k;
+const videoCaution=needs4kCaution?'画質：公式情報では4K UHD対応作品ですが、取得できたMPDには4Kの配信候補がなく、この環境での4K再生可否は確認できませんでした。':'';
+const finalNote=[videoCaution,capability.note].filter(Boolean).join('\n');
+render('解析完了',audioMain,audioSub,videoMain,videoSub,finalNote,detail+'\n再生対応判定: '+capability.detail);
 busy=false;
 }
 catch(e){fail(e)}}
