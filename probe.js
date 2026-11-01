@@ -102,6 +102,27 @@ window.addEventListener('message',async e=>{
 
 const featureHash='853a073696b3f87faccf8c1f134a6085f3d16706e0d037a4426707bf40bb0fe3';
 const featureCodes={dv:'FET0009245',fourk:'FET0008865',atmos:'FET0008864'};
+const searchHash='047adb69b630af6e1e599e08736be2f5210dde9a04b6f78c6a4eb702d01a9db2';
+window.addEventListener('message',async e=>{
+ const m=e.data;if(e.source!==window||m?.source!=='UAI_DOLBY_SEARCH_QUERY'||!extensionEnabled)return;
+ const id=String(m.id||''),ctrl=new AbortController(),key='search-'+id;activeQueries.set(key,ctrl);
+ const send=data=>window.postMessage({source:'UAI_DOLBY_SEARCH_RESULT',id,data},location.origin);
+ try{
+  const vars=page=>({query:'ドルビー',page,pageSize:20,filterSaleType:null,sortOrder:'RECOMMEND'});
+  const load=async page=>{const data=await query('cosmo_videoFreewordSearch',vars(page),searchHash,ctrl.signal);const x=data?.webfront_videoFreewordSearch;if(!x||!Array.isArray(x.titles)||Number(x.pageInfo?.page)!==page)throw Error('検索応答が不正です');return x};
+  const first=await load(1),pages=Number(first.pageInfo.pages),expected=Number(first.pageInfo.results);
+  if(!Number.isInteger(pages)||pages<1||pages>100||!Number.isInteger(expected)||expected<1)throw Error('検索ページ数が不正です');
+  const batches=new Array(pages);batches[0]=first.titles;let next=2;
+  const worker=async()=>{while(next<=pages&&!ctrl.signal.aborted){const page=next++,x=await load(page);if(Number(x.pageInfo.pages)!==pages||Number(x.pageInfo.results)!==expected)throw Error('検索結果が途中で変更されました');batches[page-1]=x.titles}};
+  await Promise.all(Array.from({length:Math.min(4,pages-1)},worker));
+  if(ctrl.signal.aborted)return;
+  const ids=batches.flat().map(x=>x?.id);
+  if(ids.length!==expected||ids.some(x=>typeof x!=='string'||!/^SID\d+$/.test(x))||new Set(ids).size!==expected)throw Error('検索結果の取得が不完全です');
+  send({ids,pages});
+ }catch(error){if(!ctrl.signal.aborted)send({error:String(error.message||error).slice(0,160)})}
+ finally{activeQueries.delete(key)}
+});
+
 window.addEventListener('message',async e=>{
  const m=e.data;
  if(e.source!==window||m?.source!=='UAI_FEATURE_QUERY'||!extensionEnabled)return;
