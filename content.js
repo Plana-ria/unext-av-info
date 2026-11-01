@@ -32,90 +32,7 @@ function mpdParse(xml){const d=new DOMParser().parseFromString(xml,'application/
 const aud=[],vid=[];for(const set of d.querySelectorAll('AdaptationSet')){const reps=[...set.children].filter(e=>e.localName==='Representation');for(const r of reps){const mime=attrs(r,'mimeType')||attrs(set,'mimeType')||'',c=attrs(r,'codecs')||attrs(set,'codecs')||'',base=attrs(r,'bandwidth'),w=+(attrs(r,'width')||attrs(set,'width')||0),h=+(attrs(r,'height')||attrs(set,'height')||0);if(!/audio/i.test(mime)&&!/^(ec-3|ac-3|mp4a)/i.test(c)){if(w||h)vid.push({w,h,c,bitrate:+base||0,fps:attrs(r,'frameRate')||attrs(set,'frameRate')||''});continue}
 let ac=r.querySelector('AudioChannelConfiguration')||set.querySelector('AudioChannelConfiguration');const conf=ac?.getAttribute('value')||'';let channels=null;if(/^\d+$/.test(conf))channels=+conf;else if(/^F801$/i.test(conf)&&/ec-3|ac-3/i.test(c))channels=6;
 aud.push({c,channels,config:conf,bitrate:+base||0,rate:attrs(r,'audioSamplingRate')||attrs(set,'audioSamplingRate')||'',representation:r,adaptation:set})}}
-const videoNodes=[...d.querySelectorAll('Representation')].filter(r=>{const set=r.parentElement;return /video/i.test(r.getAttribute('mimeType')||set?.getAttribute('mimeType')||'')||!!(r.getAttribute('width')||set?.getAttribute('width'))});
-const dvIndicators=[...new Set(videoNodes.flatMap(r=>{
- const set=r.parentElement,values=[r.getAttribute('codecs'),set?.getAttribute('codecs'),r.getAttribute('supplementalCodecs'),set?.getAttribute('supplementalCodecs')].filter(Boolean);
- const props=[...r.querySelectorAll('SupplementalProperty,EssentialProperty'),...set.querySelectorAll('SupplementalProperty,EssentialProperty')].map(p=>(p.getAttribute('schemeIdUri')||'')+'='+ (p.getAttribute('value')||'')).filter(v=>/dolby|dovi|dvhe|dvh1|dva1|dvav/i.test(v));
- return [...values.filter(v=>/dvhe|dvh1|dva1|dvav/i.test(v)),...props];
-}))].map(x=>x.slice(0,180));
-const dvCodecs=[...new Set(videoNodes.flatMap(r=>[r.getAttribute('codecs')||r.parentElement?.getAttribute('codecs')||'',r.getAttribute('supplementalCodecs')||r.parentElement?.getAttribute('supplementalCodecs')||'']).filter(Boolean))].slice(0,16);
-const mpdAtmos=[...d.querySelectorAll('SupplementalProperty,EssentialProperty')].some(p=>/EC3_ExtensionType/i.test(p.getAttribute('schemeIdUri')||'')&&/JOC/i.test(p.getAttribute('value')||'')&&!!aud.find(a=>/ec-3/i.test(a.c)));return{aud,vid,mpdAtmos,d,dvIndicators,dvCodecs}}
-// Diagnostic-only metadata; keep URLs, tokens and raw media bytes out of the report.
-function hdrMpdEvidence(parsed){
- const out=[];
- const nodes=[...parsed.d.querySelectorAll('AdaptationSet')].filter(x=>/video/i.test(x.getAttribute('mimeType')||'')||x.querySelector('[width]'));
- for(const set of nodes)for(const r of [...set.children].filter(e=>e.localName==='Representation')){
-  const props=[...set.children,...r.children].filter(n=>['SupplementalProperty','EssentialProperty'].includes(n.localName));
-  const safe=v=>String(v||'').slice(0,110).replace(/https?:\/\/\S+/g,'[URL]'); 
-  const description={resolution:(r.getAttribute('width')||set.getAttribute('width')||'?')+'x'+(r.getAttribute('height')||set.getAttribute('height')||'?'),codecs:safe(r.getAttribute('codecs')||set.getAttribute('codecs')),supplementalCodecs:safe(r.getAttribute('supplementalCodecs')||set.getAttribute('supplementalCodecs'))};
-  const entries=props.map(p=>({scheme:safe(p.getAttribute('schemeIdUri')),value:safe(p.getAttribute('value'))})).filter(p=>/colour|color|transfer|primaries|hdr|dolby|dovi|smpte|cicp|2084|arib|2086|clli/i.test(p.scheme+' '+p.value));
-  out.push({...description,properties:entries});
- }
- return out.slice(0,30);
-}
-function videoInitBoxes(bytes){
- const boxes=[],found=[];
- const recognized=new Set(['dvcC','dvvC','dvcc','dvvc','hvcC','avcC','colr','mdcv','clli']);
- for(let i=0;i+8<=bytes.length;i++){
-  const type=String.fromCharCode(...bytes.subarray(i+4,i+8));
-  if(!recognized.has(type))continue;
-  const size=(bytes[i]*16777216+bytes[i+1]*65536+bytes[i+2]*256+bytes[i+3])>>>0;
-  if(size<8||i+size>bytes.length)continue;
-  const data=bytes.subarray(i+8,i+size);
-  const item={type,size};
-  if(type==='dvcC'||type==='dvvC'||type==='dvcc'||type==='dvvc'){
-   if(data.length>=4){item.version=data[0]+'.'+data[1];item.profile=data[2]>>1;item.level=((data[2]&1)<<5)|(data[3]>>3)}
-  }else if(type==='colr'&&data.length>=11){
-   item.colourType=String.fromCharCode(...data.subarray(0,4));
-   if(item.colourType==='nclx'||item.colourType==='nclc'){
-    item.primaries=(data[4]<<8)|data[5];item.transfer=(data[6]<<8)|data[7];item.matrix=(data[8]<<8)|data[9];
-   }
-  }else if(type==='hvcC'&&data.length>=2){item.hevcProfile=data[1]&31}
-  boxes.push(item);if(['dvcC','dvvC','dvcc','dvvc'].includes(type))found.push(item);
- }
- const transfers=boxes.filter(x=>x.type==='colr'&&x.transfer!=null).map(x=>x.transfer);
- return {boxes:boxes.slice(0,30),dolbyVisionBoxes:found,transfer:transfers.includes(16)?'PQ / HDR10候補':transfers.includes(18)?'HLG候補':transfers.length?'転送特性 '+transfers.join(','):'未確認'};
-}
-async function inspectVideoInits(parsed,mpdUrl,cache){
- const direct=(n,name)=>[...n?.children||[]].find(x=>x.localName===name);
- const tracks=parsed.vid.slice().sort((a,b)=>b.w*b.h-a.w*a.h||b.bitrate-a.bitrate).slice(0,4);
- const results=[];
- for(const t of tracks){
-  const set=[...parsed.d.querySelectorAll('Representation')].find(r=>(r.getAttribute('codecs')||r.parentElement?.getAttribute('codecs')||'')===t.c&&+(r.getAttribute('width')||r.parentElement?.getAttribute('width')||0)===t.w&&+(r.getAttribute('height')||r.parentElement?.getAttribute('height')||0)===t.h);
-  const row={resolution:t.w+'x'+t.h,codec:t.c,bitrate:t.bitrate};
-  if(!set){row.status='該当トラックなし';results.push(row);continue}
-  try{
-   const adapt=set.parentElement;let base=mpdUrl;
-   for(const n of [parsed.d.documentElement,direct(parsed.d.documentElement,'Period'),adapt,set]){
-    const u=direct(n,'BaseURL')?.textContent?.trim();if(u)base=new URL(u,base).href;
-   }
-   const template=direct(set,'SegmentTemplate')||direct(adapt,'SegmentTemplate');
-   const segmentBase=direct(set,'SegmentBase')||direct(adapt,'SegmentBase');
-   let rel=template?.getAttribute('initialization'),range='bytes=0-262143';
-   if(rel){rel=rel.replace(/\$RepresentationID\$/g,set.getAttribute('id')||'').replace(/\$Bandwidth\$/g,set.getAttribute('bandwidth')||'');if(/\$[^$]+\$/.test(rel))throw Error('初期化URL変数を解決できません')}
-   else{const init=direct(segmentBase,'Initialization');if(!init)throw Error('初期化セグメント指定なし');rel=init.getAttribute('sourceURL')||'';const raw=init.getAttribute('range');if(raw&&/^\d+-\d+$/.test(raw)){const [a,b]=raw.split('-').map(Number);range='bytes='+a+'-'+Math.min(b,a+262143)}}
-   const url=new URL(rel||'',base),key=url.href+'|'+range;
-   let parsedInit=cache.get(key);
-   if(!parsedInit){
-    const response=await chrome.runtime.sendMessage({type:'FETCH',url:url.href,range});
-    if(response?.error)throw Error(response.error);
-    const raw=atob(response.base64||'');
-    parsedInit=videoInitBoxes(Uint8Array.from(raw,x=>x.charCodeAt(0)));
-    cache.set(key,parsedInit);
-   }
-   Object.assign(row,parsedInit,{status:'取得成功'});
-  }catch(e){row.status='取得失敗: '+String(e.message||e).slice(0,110)}
-  results.push(row);
- }
- return results;
-}
-function hdrDiagnostic(mpd,init){
- const blocks=init.flatMap(r=>r.dolbyVisionBoxes||[]);
- const mpdDv=mpd.some(r=>/dvhe|dvh1|dvav|dva1|dolby.*vision|dovi/i.test((r.codecs||'')+' '+(r.supplementalCodecs||'')+' '+JSON.stringify(r.properties)));
- const pq=init.some(x=>x.transfer?.startsWith('PQ'))||mpd.some(x=>/2084|pq|smpte-st-2084/i.test(JSON.stringify(x.properties)));
- const hlg=init.some(x=>x.transfer?.startsWith('HLG'))||mpd.some(x=>/hlg|arib-std-b67/i.test(JSON.stringify(x.properties)));
- return {dolbyVision:blocks.length||mpdDv?'識別情報あり':'未確認（非対応とは限りません）',hdr10:pq?'PQあり（HDR10確定ではありません）':'未確認',hlg:hlg?'HLG関連情報あり':'未確認'};
-}
+const mpdAtmos=[...d.querySelectorAll('SupplementalProperty,EssentialProperty')].some(p=>/EC3_ExtensionType/i.test(p.getAttribute('schemeIdUri')||'')&&/JOC/i.test(p.getAttribute('value')||'')&&!!aud.find(a=>/ec-3/i.test(a.c)));return{aud,vid,mpdAtmos,d}}
 function parseDec3(bytes){for(let i=0;i+12<bytes.length;i++){if(bytes[i+4]!==100||bytes[i+5]!==101||bytes[i+6]!==99||bytes[i+7]!==51)continue;const n=(bytes[i]*16777216+bytes[i+1]*65536+bytes[i+2]*256+bytes[i+3])>>>0;if(n<10||i+n>bytes.length)continue;const p=bytes.slice(i+8,i+n);const hex=[...p].map(v=>v.toString(16).padStart(2,'0')).join(' ');return {hex,atmos:p.length>=7&&p[p.length-2]===1&&p[p.length-1]>0,bytes:p.length}}return null}
 async function checkInit(parsed,mpdUrl,initCache=new Map()){
 const direct=(n,name)=>[...n?.children||[]].find(x=>x.localName===name);
@@ -162,7 +79,7 @@ return {atmos:false,details:(list.join('\n')||'初期化情報なし')+(tracks.l
 // Shared MPD inspection for the playback page. Does not infer the maximum from the active player track.
 window.__uaiAnalyzePlaylist=async function(mpds,isCurrent=()=>true){
  if(!Array.isArray(mpds)||!mpds.length)throw Error('MPD URLがありません');
- const audio=[],video=[],initCache=new Map(),dvIndicators=[],dvCodecs=[],hdrMpd=[],videoInit=[],videoCache=new Map();let atmos=false,success=0;
+ const audio=[],video=[],initCache=new Map();let atmos=false,success=0;
  for(const url of mpds.slice(0,3)){
   if(!isCurrent())throw Error('解析が中断されました');
   const response=await chrome.runtime.sendMessage({type:'FETCH',url});
@@ -170,7 +87,7 @@ window.__uaiAnalyzePlaylist=async function(mpds,isCurrent=()=>true){
   if(response?.error)continue;
   let parsed;try{parsed=mpdParse(response.text)}catch{continue}
   if(!parsed.aud.length&&!parsed.vid.length)continue;
-  success++;audio.push(...parsed.aud);video.push(...parsed.vid);dvIndicators.push(...parsed.dvIndicators);dvCodecs.push(...parsed.dvCodecs);hdrMpd.push(...hdrMpdEvidence(parsed));videoInit.push(...await inspectVideoInits(parsed,url,videoCache));if(!isCurrent())throw Error('解析が中断されました');
+  success++;audio.push(...parsed.aud);video.push(...parsed.vid);
   if(parsed.mpdAtmos)atmos=true;
   if(!atmos&&parsed.aud.some(x=>/ec-3/i.test(x.c))){
    try{atmos=(await checkInit(parsed,url,initCache)).atmos}catch{}
@@ -180,7 +97,7 @@ window.__uaiAnalyzePlaylist=async function(mpds,isCurrent=()=>true){
  if(!success)throw Error('MPD解析ができませんでした');
  video.sort((a,b)=>b.w*b.h-a.w*a.h||b.bitrate-a.bitrate);
  audio.sort((a,b)=>channelCount(b)-channelCount(a)||(/ec-3/i.test(b.c)?1:0)-(/ec-3/i.test(a.c)?1:0)||b.bitrate-a.bitrate);
- return {video:video[0]?videoLabel(video[0])+' ('+codec(video[0].c)+')':'未確認',audio:atmos?'Dolby Atmos':audio[0]?audioLabel(audio[0]):'未確認',dolbyVision:dvIndicators.length?'識別情報あり':'識別情報なし（非対応とは限りません）',dvIndicators:[...new Set(dvIndicators)],dvCodecs:[...new Set(dvCodecs)],hdr:hdrDiagnostic(hdrMpd,videoInit),hdrMpd,videoInit,success};
+ return {video:video[0]?videoLabel(video[0])+' ('+codec(video[0].c)+')':'未確認',audio:atmos?'Dolby Atmos':audio[0]?audioLabel(audio[0]):'未確認',success};
 };
 function fpsNumber(s){if(!s)return 24;const [n,d]=String(s).split('/').map(Number);return Number.isFinite(n)&&n>0&&(!d||d>0)?n/(d||1):24}
 function channelCount(a){return Number(a.channels)||(/F801/i.test(a.config)&&/ec-3|ac-3/i.test(a.c)?6:0)}
@@ -275,7 +192,7 @@ if(!valid())return;
 if(data.title&&data.title!==title)throw Error('作品IDが一致しません');
 if(data.error)throw Error(data.error);
 if(!data.mpds?.length)throw Error('MPD URLを取得できませんでした');
-const groups=[],failures=[],initCache=new Map(),videoCache=new Map(),hdrMpd=[],videoInit=[];
+const groups=[],failures=[],initCache=new Map();
 for(const url of data.mpds){
  if(!valid())return;
  try{
@@ -285,7 +202,6 @@ for(const url of data.mpds){
   const parsed=mpdParse(response.text);
   if(!parsed.aud.length&&!parsed.vid.length)throw Error('MPDに映像・音声情報がありません');
   const alreadyAtmos=groups.some(g=>g.parsed.mpdAtmos||g.init.atmos);
-  hdrMpd.push(...hdrMpdEvidence(parsed));videoInit.push(...await inspectVideoInits(parsed,url,videoCache));if(!valid())return;
   const init=parsed.mpdAtmos||alreadyAtmos?{atmos:parsed.mpdAtmos,details:parsed.mpdAtmos?'MPDにDolby Atmos (JOC) 情報あり':'他のMPDでAtmosを検出済み'}:await checkInit(parsed,url,initCache);
   if(!valid())return;
   groups.push({parsed,init});
