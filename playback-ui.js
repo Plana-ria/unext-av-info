@@ -18,7 +18,7 @@ function mount(){
   el.querySelector('[data-uai-cell="audio-head"]').textContent='音声';
   el.querySelector('[data-uai-cell="current-label"]').textContent='現在品質';
   el.querySelector('[data-uai-cell="highest-label"]').textContent='最高品質';
-  const diagnostic=document.createElement('span');diagnostic.dataset.uaiCell='dv-diagnostic';diagnostic.style.cssText='grid-column:1/-1;font-size:.92em;color:#b3bfcd;white-space:nowrap';diagnostic.textContent='DV検証：確認中';el.append(diagnostic);
+  const diagnostic=document.createElement('span');diagnostic.dataset.uaiCell='dv-diagnostic';diagnostic.style.cssText='grid-column:1/-1;font-size:.92em;color:#b3bfcd;white-space:nowrap';diagnostic.textContent='HDR検証：確認中';el.append(diagnostic);
   parent.after(el);
  }
  draw();
@@ -64,8 +64,8 @@ async function loadPlaylistHighest(){
   const summary=await analyze(result.mpds,valid);
   if(!valid())return;
   playlistHighest='映像 '+summary.video+' · 音声 '+summary.audio;
-  dvDiagnostic=summary.dolbyVision+(summary.dvIndicators?.length?' / '+summary.dvIndicators.join('; '):'');
-  console.info('[U-NEXT AV Info DV test]',{status:summary.dolbyVision,indicators:summary.dvIndicators,videoCodecs:summary.dvCodecs});
+  dvDiagnostic='DV: '+summary.hdr.dolbyVision+' / HDR(PQ): '+summary.hdr.hdr10+' / HLG: '+summary.hdr.hlg;
+  console.info('[U-NEXT AV Info HDR test]',{summary:summary.hdr,mpdVideo:summary.hdrMpd,videoInitialization:summary.videoInit,atmos:summary.audio,videoCodecs:summary.dvCodecs});
   draw();
  }catch(e){
   if(!valid())return;
@@ -88,7 +88,7 @@ function draw(){
  const highestVideo=index>=0?highest.slice(0,index).replace(/^映像 /,''):'確認中';
  const highestAudio=index>=0?highest.slice(index+separator.length):'確認中';
  for(const el of document.querySelectorAll('.'+CLS)){
-  const dv=el.querySelector('[data-uai-cell="dv-diagnostic"]');if(dv)dv.textContent='DV検証：'+dvDiagnostic;
+  const dv=el.querySelector('[data-uai-cell="dv-diagnostic"]');if(dv)dv.textContent='HDR検証：'+dvDiagnostic;
   const cells={currentVideo,currentAudio,highestVideo,highestAudio};
   for(const [name,value] of Object.entries(cells)){
    const cell=el.querySelector('[data-uai-cell="'+name.replace(/[A-Z]/g,x=>'-'+x.toLowerCase())+'"]');
