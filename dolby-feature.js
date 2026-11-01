@@ -12,7 +12,7 @@ function update(){
  if(primary){
   const value=primary.textContent||'';
   const base=value.replace(/ Dolby Vision$/,'');
-  const valid=base!=='解析待ち'&&base!=='確認中'&&base!=='不明'&&base!=='取得不可';
+  const valid=/^(?:4K UHD|Full HD|HD|[0-9]+p)$/.test(base);
   const next=matched()&&valid?base+' Dolby Vision':base;
   if(value!==next)primary.textContent=next;
  }
