@@ -100,25 +100,36 @@ window.addEventListener('message',async e=>{
 });
 
 
-const dvFeatureHash='853a073696b3f87faccf8c1f134a6085f3d16706e0d037a4426707bf40bb0fe3';
+const featureHash='853a073696b3f87faccf8c1f134a6085f3d16706e0d037a4426707bf40bb0fe3';
+const featureCodes={dv:'FET0009245',fourk:'FET0008865'};
 window.addEventListener('message',async e=>{
- const m=e.data;if(e.source!==window||m?.source!=='UAI_DV_FEATURE_QUERY'||!extensionEnabled)return;
- const id=String(m.id||''),controller=new AbortController();activeQueries.set('dv-'+id,controller);
- const send=data=>window.postMessage({source:'UAI_DV_FEATURE_RESULT',id,data},location.origin);
+ const m=e.data;
+ if(e.source!==window||m?.source!=='UAI_FEATURE_QUERY'||!extensionEnabled)return;
+ const featureCode=featureCodes[m.kind];
+ if(!featureCode)return;
+ const id=String(m.id||''),controller=new AbortController(),key='feature-'+id;
+ activeQueries.set(key,controller);
+ const send=data=>window.postMessage({source:'UAI_FEATURE_RESULT',id,kind:m.kind,data},location.origin);
  try{
-  const all=[],seen=new Set();let pages=1,expected=0;
-  for(let page=1;page<=pages&&page<=30;page++){
-   if(controller.signal.aborted||!extensionEnabled)return;
-   const data=await query('cosmo_VideoFeature',{featureCode:'FET0009245',page,pageSize:20},dvFeatureHash,controller.signal);
+  const fetchPage=async page=>{
+   const data=await query('cosmo_VideoFeature',{featureCode,page,pageSize:20},featureHash,controller.signal);
    const feature=data?.webfront_feature;
-   if(feature?.id!=='FET0009245'||!feature.pageInfo||!Array.isArray(feature.titles))throw Error('特集API応答形式が一致しません');
-   if(page===1){expected=Number(feature.pageInfo.results);pages=Number(feature.pageInfo.pages);if(!Number.isInteger(pages)||pages<1||pages>30)throw Error('ページ数が不正です')}
+   if(feature?.id!==featureCode||!feature.pageInfo||!Array.isArray(feature.titles))throw Error('特集API応答形式が一致しません');
    if(Number(feature.pageInfo.page)!==page)throw Error('ページ番号が一致しません');
-   for(const title of feature.titles){if(typeof title.id==='string'&&/^SID\d+$/.test(title.id)&&!seen.has(title.id)){seen.add(title.id);all.push(title.id)}}
-  }
-  if(!all.length||!Number.isInteger(expected)||all.length!==expected)throw Error('作品一覧の取得が不完全です ('+all.length+'/'+expected+')');
-  send({ids:all,pages});
+   return feature;
+  };
+  const first=await fetchPage(1);
+  const pages=Number(first.pageInfo.pages),expected=Number(first.pageInfo.results);
+  if(!Number.isInteger(pages)||pages<1||pages>100||!Number.isInteger(expected)||expected<1)throw Error('ページ情報が不正です');
+  const results=new Array(pages);results[0]=first.titles;
+  let next=2;
+  const worker=async()=>{while(next<=pages&&!controller.signal.aborted){const page=next++;const result=await fetchPage(page);if(Number(result.pageInfo.pages)!==pages||Number(result.pageInfo.results)!==expected)throw Error('取得中に一覧が変更されました');results[page-1]=result.titles}};
+  await Promise.all(Array.from({length:Math.min(4,pages-1)},worker));
+  if(controller.signal.aborted)return;
+  const ids=results.flat().map(t=>t?.id);
+  if(ids.length!==expected||ids.some(v=>typeof v!=='string'||!/^SID\d+$/.test(v))||new Set(ids).size!==expected)throw Error('作品一覧の取得が不完全です');
+  send({ids,pages});
  }catch(err){if(!controller.signal.aborted)send({error:String(err.message||err).slice(0,160)})}
- finally{activeQueries.delete('dv-'+id)}
+ finally{activeQueries.delete(key)}
 });
 })();
