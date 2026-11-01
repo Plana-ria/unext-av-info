@@ -2,7 +2,7 @@
 const TTL=24*60*60*1000,RETRY=15*60*1000;
 const specs={dv:{key:'uaiDvOfficialFeatureV2'},fourk:{key:'uai4kOfficialFeatureV1'},atmos:{key:'uaiAtmosOfficialFeatureV1'},audio:{key:'uaiDolbyAudioSearchV1'}};
 const state={dv:{cache:null,inflight:false,lastAttempt:0},fourk:{cache:null,inflight:false,lastAttempt:0},atmos:{cache:null,inflight:false,lastAttempt:0},audio:{cache:null,inflight:false,lastAttempt:0}};
-let enabled=false,serial=0,lastUrl=location.href,lastFlags='';
+let enabled=false,viewsReady=false,showAny=true,serial=0,lastUrl=location.href,lastFlags='';
 const sid=()=>window.__uaiCurrentTitleId?.()||location.pathname.match(/SID\d+/)?.[0]||null;
 const matches=kind=>enabled&&!!state[kind].cache?.ids?.includes(sid());
 window.__uaiDvMatched=()=>matches('dv');
@@ -26,7 +26,7 @@ function paint(){
 }
 async function refresh(kind){
  const item=state[kind],cache=item.cache,now=Date.now();
- if(!enabled||item.inflight||cache&&now-cache.time<TTL||now-item.lastAttempt<RETRY)return;
+ if(!enabled||!viewsReady||!showAny||item.inflight||cache&&now-cache.time<TTL||now-item.lastAttempt<RETRY)return;
  item.inflight=true;item.lastAttempt=now;
  const id=kind+'-'+(++serial);
  try{
@@ -47,12 +47,14 @@ async function refresh(kind){
  }catch(e){console.warn('[U-NEXT AV Info] '+kind+' feature lookup:',String(e.message||e).slice(0,160))}
  finally{item.inflight=false;paint()}
 }
-function start(){if(!enabled)return;refresh('dv');refresh('fourk');refresh('atmos');refresh('audio')}
+function start(){if(!enabled||!viewsReady||!showAny)return;refresh('dv');refresh('fourk');refresh('atmos');refresh('audio')}
 function setEnabled(v){enabled=v===true;paint();start()}
 chrome.runtime.onMessage.addListener(m=>{if(m?.type==='UAI_ENABLED_CHANGED')setEnabled(m.enabled!==false)});
-Promise.all([chrome.storage.local.get(Object.values(specs).map(s=>s.key)),chrome.runtime.sendMessage({type:'UAI_GET_ENABLED'})]).then(([stored,reply])=>{
+Promise.all([chrome.storage.local.get([...Object.values(specs).map(s=>s.key),'uaiShowTitle','uaiShowPlayback','uaiShowLists']),chrome.runtime.sendMessage({type:'UAI_GET_ENABLED'})]).then(([stored,reply])=>{
+ showAny=stored.uaiShowTitle!==false||stored.uaiShowPlayback!==false||stored.uaiShowLists!==false;viewsReady=true;
  for(const kind of Object.keys(specs)){const c=stored[specs[kind].key];if(c&&Array.isArray(c.ids)&&Number.isFinite(c.time))state[kind].cache=c}
  setEnabled(reply?.enabled!==false);
 }).catch(e=>console.warn('[U-NEXT AV Info] feature cache:',String(e.message||e)));
+chrome.storage.onChanged.addListener((changes,area)=>{if(area!=='local'||!['uaiShowTitle','uaiShowPlayback','uaiShowLists'].some(k=>changes[k]))return;chrome.storage.local.get(['uaiShowTitle','uaiShowPlayback','uaiShowLists']).then(v=>{showAny=v.uaiShowTitle!==false||v.uaiShowPlayback!==false||v.uaiShowLists!==false;if(showAny)start()}).catch(()=>{})});
 setInterval(()=>{if(lastUrl!==location.href){lastUrl=location.href;lastFlags=''}paint();start()},1800);
 })();
