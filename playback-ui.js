@@ -1,5 +1,5 @@
 (()=>{if(window.__uaiPlaybackUi)return;window.__uaiPlaybackUi=true;
-const CLS='uai-playback-info';let enabled=false,dvDiagnostic='確認中',playlistHighest=null,playlistBusy=false,playlistKey='',playlistAttempts=0,playlistGeneration=0;let serial=0,waiting=false,last=null,lastReply=0,lastPath='';
+const CLS='uai-playback-info';let enabled=false,hdrReport='解析待ち',dvDiagnostic='確認中',playlistHighest=null,playlistBusy=false,playlistKey='',playlistAttempts=0,playlistGeneration=0;let serial=0,waiting=false,last=null,lastReply=0,lastPath='';
 function q(w,h){return !w||!h?'取得不可':h>=2160?'4K UHD':h>=1080?'Full HD':h>=720?'HD':h+'p'}
 function audio(t,ch){const name=/ec-3/i.test(t)?'Dolby Digital Plus':/ac-3/i.test(t)?'Dolby Digital':/mp4a/i.test(t)?'AAC':'音声形式不明';return name+' ('+(ch===2?'2.0ch':ch===1?'1.0ch':ch===6?'5.1ch':ch?ch+'ch・配置未確認':'ch未確認')+')'}
 function trackAudio(t){if(!t?.audioCodec)return '取得不可';return audio(t.audioCodec,t.channelsCount)}
@@ -19,6 +19,7 @@ function mount(){
   el.querySelector('[data-uai-cell="current-label"]').textContent='現在品質';
   el.querySelector('[data-uai-cell="highest-label"]').textContent='最高品質';
   const diagnostic=document.createElement('span');diagnostic.dataset.uaiCell='dv-diagnostic';diagnostic.style.cssText='grid-column:1/-1;font-size:.92em;color:#b3bfcd;white-space:nowrap';diagnostic.textContent='HDR検証：確認中';el.append(diagnostic);
+  const details=document.createElement('details');details.style.cssText='grid-column:1/-1;pointer-events:auto;white-space:normal;max-width:min(570px,80vw);font-size:11px';details.innerHTML='<summary style="cursor:pointer;color:#b5dcff">HDR診断の詳細を表示</summary><pre style="max-height:35vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text"></pre><button type="button" style="pointer-events:auto;cursor:pointer;color:white;background:#32628d;border:1px solid #809ab0;padding:3px 8px;border-radius:4px">診断結果をコピー</button>';details.querySelector('button').addEventListener('click',async e=>{e.stopPropagation();const report=hdrReport;try{await navigator.clipboard.writeText(report);e.target.textContent='コピーしました'}catch{e.target.textContent='コピー失敗：下のテキストを選択してください'}});el.append(details);
   parent.after(el);
  }
  draw();
@@ -38,7 +39,7 @@ function highestQuality(){
 }
 function resetPlaylist(){
  if(playlistBusy)window.postMessage({source:'UAI_CANCEL_PLAYBACK_QUERY',id:playlistKey+'|'+playlistGeneration},location.origin);
- playlistGeneration++;playlistBusy=false;playlistHighest=null;dvDiagnostic='確認中';playlistKey='';playlistAttempts=0;
+ playlistGeneration++;playlistBusy=false;playlistHighest=null;dvDiagnostic='確認中';hdrReport='解析待ち';playlistKey='';playlistAttempts=0;
 }
 async function loadPlaylistHighest(){
  if(!enabled||!location.pathname.startsWith('/play/')||playlistBusy)return;
@@ -65,6 +66,7 @@ async function loadPlaylistHighest(){
   if(!valid())return;
   playlistHighest='映像 '+summary.video+' · 音声 '+summary.audio;
   dvDiagnostic='DV: '+summary.hdr.dolbyVision+' / HDR(PQ): '+summary.hdr.hdr10+' / HLG: '+summary.hdr.hlg;
+  hdrReport=JSON.stringify({summary:summary.hdr,mpdVideo:summary.hdrMpd,videoInitialization:summary.videoInit,atmos:summary.audio,videoCodecs:summary.dvCodecs},null,2);
   console.info('[U-NEXT AV Info HDR test]',{summary:summary.hdr,mpdVideo:summary.hdrMpd,videoInitialization:summary.videoInit,atmos:summary.audio,videoCodecs:summary.dvCodecs});
   draw();
  }catch(e){
@@ -73,7 +75,7 @@ async function loadPlaylistHighest(){
   const temporary=/タイムアウト|通信|network|fetch|HTTP 5\\d\\d/i.test(String(e?.message||e));
   if(!temporary||playlistAttempts>=2)playlistAttempts=2;
   playlistHighest=playlistAttempts>=2?'映像 取得不可 · 音声 取得不可':null;
-  if(playlistHighest)dvDiagnostic='取得不可';
+  if(playlistHighest){dvDiagnostic='取得不可';hdrReport='解析エラー: '+String(e?.message||e).slice(0,250)};
   if(!playlistHighest)setTimeout(()=>{if(valid())loadPlaylistHighest()},1200);
   draw();
  }finally{if(valid())playlistBusy=false}
@@ -89,6 +91,7 @@ function draw(){
  const highestAudio=index>=0?highest.slice(index+separator.length):'確認中';
  for(const el of document.querySelectorAll('.'+CLS)){
   const dv=el.querySelector('[data-uai-cell="dv-diagnostic"]');if(dv)dv.textContent='HDR検証：'+dvDiagnostic;
+  const report=el.querySelector('details pre');if(report&&report.textContent!==hdrReport)report.textContent=hdrReport;
   const cells={currentVideo,currentAudio,highestVideo,highestAudio};
   for(const [name,value] of Object.entries(cells)){
    const cell=el.querySelector('[data-uai-cell="'+name.replace(/[A-Z]/g,x=>'-'+x.toLowerCase())+'"]');
