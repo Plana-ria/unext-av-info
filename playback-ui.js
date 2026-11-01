@@ -82,7 +82,11 @@ function draw(){
  const separator=' · 音声 ';
  const index=highest?.indexOf(separator)??-1;
  const baseVideo=index>=0?highest.slice(0,index).replace(/^映像 /,''):'確認中';
- const highestVideo=window.__uaiDvMatched?.()&&index>=0?(baseVideo.includes(' (')?baseVideo.replace(' (',' Dolby Vision ('):baseVideo+' Dolby Vision'):baseVideo;
+ const fourk=window.__uai4kMatched?.()===true,dv=window.__uaiDvMatched?.()===true;
+ const actual4k=/^4K UHD\b/.test(baseVideo);
+ const enhanced=fourk&&!actual4k&&index>=0&&baseVideo!=='取得不可'&&baseVideo!=='確認中';
+ const videoWith4k=enhanced?baseVideo.replace(/^(?:Full HD|HD|\d+p)/,'4K UHD'):baseVideo;
+ const highestVideo=dv&&index>=0&&videoWith4k!=='取得不可'&&videoWith4k!=='確認中'?(videoWith4k.includes(' (')?videoWith4k.replace(' (',' Dolby Vision ('):videoWith4k+' Dolby Vision'):videoWith4k;
  const highestAudio=index>=0?highest.slice(index+separator.length):'確認中';
  for(const el of document.querySelectorAll('.'+CLS)){
   const cells={currentVideo,currentAudio,highestVideo,highestAudio};
