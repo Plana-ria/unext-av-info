@@ -81,7 +81,7 @@ function draw(){
  const highest=playlistHighest;
  const separator=' · 音声 ';
  const index=highest?.indexOf(separator)??-1;
- const highestVideo=index>=0?highest.slice(0,index).replace(/^映像 /,''):'確認中';
+ const highestVideo=(index>=0?highest.slice(0,index).replace(/^映像 /,''):'確認中')+(window.__uaiDvMatched?.()?' · Dolby Vision':'');
  const highestAudio=index>=0?highest.slice(index+separator.length):'確認中';
  for(const el of document.querySelectorAll('.'+CLS)){
   const cells={currentVideo,currentAudio,highestVideo,highestAudio};
@@ -107,6 +107,7 @@ function setEnabled(next){const was=enabled;enabled=next;if(!enabled){resetPlayl
 chrome.runtime.onMessage.addListener(m=>{if(m?.type==='UAI_ENABLED_CHANGED')setEnabled(m.enabled!==false)});
 chrome.runtime.sendMessage({type:'UAI_GET_ENABLED'}).then(r=>setEnabled(r?.enabled!==false)).catch(()=>{});
 let scheduled=false;
+window.addEventListener('UAI_DV_UPDATED',draw);
 new MutationObserver(()=>{if(scheduled)return;scheduled=true;setTimeout(()=>{scheduled=false;mount()},350)}).observe(document.documentElement,{childList:true,subtree:true});
 setInterval(()=>{if(enabled)query()},2500);
 reinject();setTimeout(query,500);
