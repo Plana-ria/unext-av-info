@@ -1,15 +1,15 @@
-
-// Fresh settings: legacy allowTitleAnalysis is deliberately ignored.
+// Settings are shared between the context menu and the options page.
 const DEFAULTS={uaiShowTitle:true,uaiShowPlayback:true,uaiShowLists:true,uaiAllowHistory:false};
 const ITEMS=[['uaiShowTitle','作品ページの品質表示'],['uaiShowPlayback','再生ページの品質表示'],['uaiShowLists','検索結果・一覧ページでの品質表示']];
 async function installModeMenu(){
  const saved=await chrome.storage.local.get(Object.keys(DEFAULTS));
  await chrome.contextMenus.removeAll();
- chrome.contextMenus.create({id:'uai-heading-views',title:'表示項目',contexts:['action'],enabled:false});
- for(const [key,label] of ITEMS)chrome.contextMenus.create({id:key,title:label,type:'checkbox',contexts:['action'],checked:saved[key]!==false});
- chrome.contextMenus.create({id:'uai-heading-history',title:'再生履歴への影響制御',contexts:['action'],enabled:false});
- chrome.contextMenus.create({id:'uai-history-safe',title:'未再生の作品が再生履歴へ追加されることを許容しない（推奨）',type:'radio',contexts:['action'],checked:saved.uaiAllowHistory!==true});
- chrome.contextMenus.create({id:'uai-history-allow',title:'未再生の作品が再生履歴へ追加されることを許容する',type:'radio',contexts:['action'],checked:saved.uaiAllowHistory===true});
+ chrome.contextMenus.create({id:'uai-views',title:'表示項目',contexts:['action']});
+ for(const [key,label] of ITEMS)chrome.contextMenus.create({id:key,parentId:'uai-views',title:label,type:'checkbox',contexts:['action'],checked:saved[key]!==false});
+ chrome.contextMenus.create({id:'uai-history',title:'再生履歴への影響制御',contexts:['action']});
+ chrome.contextMenus.create({id:'uai-history-safe',parentId:'uai-history',title:'未再生作品の履歴追加を許容しない（推奨）',type:'radio',contexts:['action'],checked:saved.uaiAllowHistory!==true});
+ chrome.contextMenus.create({id:'uai-history-allow',parentId:'uai-history',title:'未再生作品の履歴追加を許容する',type:'radio',contexts:['action'],checked:saved.uaiAllowHistory===true});
+ chrome.contextMenus.create({id:'uai-options',title:'設定ページを開く',contexts:['action']});
 }
 chrome.runtime.onInstalled.addListener(()=>{chrome.storage.local.remove('allowTitleAnalysis').catch(()=>{});installModeMenu().catch(console.error)});
 chrome.runtime.onStartup.addListener(()=>installModeMenu().catch(console.error));
@@ -17,6 +17,17 @@ chrome.contextMenus.onClicked.addListener(async info=>{
  const key=ITEMS.find(([id])=>id===info.menuItemId)?.[0];
  if(key)await chrome.storage.local.set({[key]:info.checked===true});
  else if(info.menuItemId==='uai-history-safe'||info.menuItemId==='uai-history-allow')await chrome.storage.local.set({uaiAllowHistory:info.menuItemId==='uai-history-allow'});
+ else if(info.menuItemId==='uai-options')await chrome.runtime.openOptionsPage();
+});
+chrome.storage.onChanged.addListener((changes,area)=>{
+ if(area!=='local'||!Object.keys(DEFAULTS).some(key=>key in changes))return;
+ // Also refresh native check marks when a setting is changed in the options page.
+ for(const [key] of ITEMS)if(key in changes)chrome.contextMenus.update(key,{checked:changes[key].newValue!==false}).catch(()=>{});
+ if('uaiAllowHistory' in changes){
+  const allow=changes.uaiAllowHistory.newValue===true;
+  chrome.contextMenus.update('uai-history-safe',{checked:!allow}).catch(()=>{});
+  chrome.contextMenus.update('uai-history-allow',{checked:allow}).catch(()=>{});
+ }
 });
 // A single toolbar toggle is shared by all U-NEXT tabs and persisted across restarts.
 let enabled=false;
