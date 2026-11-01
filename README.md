@@ -32,6 +32,10 @@
 
 詳細解析時にDolby Digital Plusの5.1chを取得できた場合は、**「Dolby Audio (5.1ch)」** とチャンネル数を表示し、その下に **「Dolby Digital Plus」** とコーデックを表示します（Dolby Atmosでは主表示にch数を付けません）。
 
+![詳細解析でDolby Audio 5.1chとDolby Digital Plusを表示した作品詳細カード](docs/images/title-card-dolby-51ch.webp)
+
+*視聴履歴への追加を許容した場合の表示例。*
+
 初期設定で表示される「2 ch」は、ステレオ配信を実測・確認したという意味ではありません。また「Full HD 以下」にはHD・SD画質の作品が含まれる可能性があります。
 
 *上の画像は初期設定での表示例です。履歴追加を許容した詳細解析モードでは、解析可能な情報が増える場合があります。*
@@ -46,6 +50,10 @@
 - **最高品質**：プレイリストなどから解析できた配信情報。4K・Dolby対応の公式掲載情報も判定に利用します。履歴追加を許容する設定では、判明したDolby Audioのch数とコーデックも表示します。
 
 例えばDolby Digital Plusの5.1chを検出した場合、履歴追加を許容する設定では再生画面の最高品質に **`Dolby Audio (5.1ch / Dolby Digital Plus)`** と表示されます。
+
+![最高品質にDolby Audio 5.1chとDolby Digital Plusを表示した再生画面](docs/images/playback-quality-dolby-51ch.webp)
+
+*再生中の品質と配信情報から取得した最高品質を比較する表示例。*
 
 「最高品質」は**今使っているブラウザで必ず再生できる品質**を意味しません。機器やアプリ、通信環境、選択した音声トラックなどによって結果は変わります。
 
