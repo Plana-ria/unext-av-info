@@ -1,7 +1,7 @@
 (()=>{if(window.__uaiDvOfficial)return;window.__uaiDvOfficial=true;
 const KEY='uaiDvOfficialFeatureV2',TTL=24*60*60*1000;
 let enabled=false,cache=null,inflight=false,requestId=0,lastError='';
-const sid=()=>location.pathname.match(/SID\d+/)?.[0]||null;
+const sid=()=>window.__uaiCurrentTitleId?.()||location.pathname.match(/SID\d+/)?.[0]||null;
 const matched=()=>enabled&&!!cache?.ids?.includes(sid());
 window.__uaiDvMatched=matched;
 function notify(){window.dispatchEvent(new Event('UAI_DV_UPDATED'))}
