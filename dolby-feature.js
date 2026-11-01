@@ -16,7 +16,7 @@ function paint(){
   const value=primary.textContent||'';
   const base=value.replace(/ Dolby Vision$/,'');
   const isQuality=/^(?:4K UHD|Full HD|HD|[0-9]+p)$/.test(base);
-  const next=isQuality?(matches('fourk')?'4K UHD':base)+(matches('dv')?' Dolby Vision':''):base;
+  const next=sh.getElementById('state')?.textContent==='解析完了'?base:isQuality?(matches('fourk')?'4K UHD':base)+(matches('dv')?' Dolby Vision':''):base;
   if(value!==next)primary.textContent=next;
  }
  const audio=sh?.getElementById('a');
