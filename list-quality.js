@@ -1,8 +1,11 @@
 (()=>{if(window.__uaiListQuality)return;window.__uaiListQuality=true;
-let enabled=true,visible=true,pending=false;
+let enabled=true,visible=true,pending=false,lastLocation=location.href;
 const style=document.createElement('style');style.textContent='.uai-list-quality{padding:5px 2px 3px;color:#c9dae8;font:500 11px/1.45 system-ui,sans-serif;display:grid;gap:2px;max-width:100%;pointer-events:none}.uai-list-quality span{overflow-wrap:anywhere}';document.documentElement.append(style);
 const quality=id=>window.__uaiQualityForId?.(id)||{};
 function isListPage(){
+ // The U-NEXT title detail overlay preserves /freeword or /browse and adds ?td=SID...
+ // Treat every URL with a title-detail parameter as a detail page.
+ if(new URL(location.href).searchParams.has('td'))return false;
  const path=location.pathname;
  // Opt in only on true discovery pages. Detail pages may use /browse/... routes,
  // so excluding only /title/SID... is not sufficient.
@@ -55,6 +58,8 @@ function update(){
 }
 function schedule(){if(pending)return;pending=true;setTimeout(()=>{pending=false;update()},400)}
 const observer=new MutationObserver(schedule);observer.observe(document.documentElement,{childList:true,subtree:true});
+// History.pushState/replaceState can change ?td without modifying the DOM immediately.
+setInterval(()=>{if(lastLocation!==location.href){lastLocation=location.href;schedule()}},500);
 window.addEventListener('UAI_QUALITY_UPDATED',schedule);
 chrome.runtime.onMessage.addListener(m=>{if(m?.type==='UAI_ENABLED_CHANGED'){enabled=m.enabled!==false;schedule()}});
 chrome.storage.local.get('uaiShowLists').then(s=>{visible=s.uaiShowLists!==false;schedule()}).catch(()=>{});
