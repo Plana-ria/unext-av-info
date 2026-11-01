@@ -237,6 +237,14 @@ render('解析完了',audioMain,audioSub,videoMain,videoSub,capability.note,deta
 busy=false;
 }
 catch(e){fail(e)}}
+function setOfficialHelpLinksFromFeatures(){
+ const sh=rootOf();if(!sh)return;
+ const dolby=window.__uaiAtmosMatched?.()===true||window.__uaiDolbyAudioMatched?.()===true;
+ const fourk=window.__uai4kMatched?.()===true;
+ sh.getElementById('dolby-help').hidden=!dolby;
+ sh.getElementById('fourk-help').hidden=!fourk;
+ sh.getElementById('official-links').hidden=!(dolby||fourk);
+}
 function safeRender(){
  const sh=rootOf();if(!sh)return;
  const atm=window.__uaiAtmosMatched?.()===true,dolby=window.__uaiDolbyAudioMatched?.()===true;
@@ -246,7 +254,7 @@ function safeRender(){
  const note=!fourk?'＊HD / SD 画質の可能性もあります':'';
  for(const [key,value] of Object.entries({state:'公式情報',a:audio,as:'',v:video,vs:note,note:'',detail:''}))sh.getElementById(key).textContent=value;
  sh.getElementById('a').dataset.uaiBaseAudio=audio;
- sh.getElementById('official-links').hidden=true;sh.getElementById('actions').hidden=true;
+ setOfficialHelpLinksFromFeatures();sh.getElementById('actions').hidden=true;
  sh.querySelector('details').hidden=true;
 }
 window.addEventListener('UAI_QUALITY_UPDATED',()=>{if(enabled&&showTitle&&!allowTitleAnalysis)safeRender()});
