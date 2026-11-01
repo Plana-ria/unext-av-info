@@ -10,7 +10,16 @@ function update(){
   const id=match[0];
   // Only use links wrapping a visible cover image; do not touch navigation or inline text links.
   if(!a.querySelector('img')||!a.getClientRects().length)continue;
-  const parent=a.parentElement;if(!parent||parent.closest('#unext-av-info-card')||parent.closest('.uai-list-quality'))continue;
+  let parent=a.parentElement;if(!parent||parent.closest('#unext-av-info-card')||parent.closest('.uai-list-quality'))continue;
+  // Choose the complete title tile, not the cropped image container.
+  for(let depth=0;depth<4;depth++){
+   const outer=parent.parentElement;if(!outer||outer===document.body)break;
+   const otherIds=new Set(Array.from(outer.querySelectorAll('a[href*="SID"]')).map(x=>(x.getAttribute('href')||'').match(/SID\\d+/)?.[0]).filter(Boolean));
+   if(otherIds.size>1)break;
+   const bounds=outer.getBoundingClientRect();
+   if(bounds.width<115||bounds.width>550||bounds.height>750)break;
+   parent=outer;
+  }
   const prior=groups.get(parent);if(!prior||prior.querySelectorAll('img').length<a.querySelectorAll('img').length)groups.set(parent,a);
  }
  for(const [parent,a] of groups){
