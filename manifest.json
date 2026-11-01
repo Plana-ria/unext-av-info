@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "U-NEXT AV Info (Dolby Vision 検証版)",
+  "name": "U-NEXT AV Info (非公式)",
   "version": "1.0.0",
   "description": "U-NEXTの配信画質・音声形式や再生中の品質を確認できる非公式ブラウザ拡張機能",
   "permissions": [
@@ -45,8 +45,7 @@
       ],
       "js": [
         "content.js",
-        "playback-ui.js",
-        "dolby-feature.js"
+        "playback-ui.js"
       ],
       "run_at": "document_idle"
     }
