@@ -31,7 +31,7 @@ function update(){
   if(label.dataset.sid!==id||label.dataset.audio!==audio||label.dataset.video!==video){
    label.dataset.sid=id;label.dataset.audio=audio;label.dataset.video=video;
    label.replaceChildren();
-   for(const line of ['🔊 '+audio,'▣ '+video]){const el=document.createElement('span');el.textContent=line;label.append(el)}
+   for(const line of ['音声：'+audio,'映像：'+video]){const el=document.createElement('span');el.textContent=line;label.append(el)}
   }
  }
 }
