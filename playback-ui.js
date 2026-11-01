@@ -89,11 +89,11 @@ function resolveHighestVideo(mpdVideo,{fourk,dv,hasPlaylist=true}){
  const codec=officialUpgrade?'':(match?.[2]||'');
  return tier+(dv?' Dolby Vision':'')+(codec?' ('+codec+')':'');
 }
-function resolveHighestAudio(mpdAudio,{atmos=false,dolby=false,allowHistory=false}){
+function resolveHighestAudio(mpdAudio,{atmos=false,dolby=false}){
  if(atmos||/^Dolby Atmos/.test(mpdAudio))return 'Dolby Atmos';
  const match=mpdAudio.match(/\((\d+(?:\.\d+)?ch)(?:・[^)]*)?\)/);
  const isDolby=/^Dolby Digital(?: Plus)?\b/.test(mpdAudio);
- if(isDolby&&allowHistory&&match)return 'Dolby Audio ('+match[1]+' / '+mpdAudio.replace(/\s*\([^)]*\)/,'')+')';
+ if(isDolby&&match)return 'Dolby Audio ('+match[1]+' / '+mpdAudio.replace(/\s*\([^)]*\)/,'')+')';
  if(dolby)return 'Dolby Audio';
  return mpdAudio;
 }
@@ -107,10 +107,10 @@ function draw(){
  const fourk=window.__uai4kMatched?.()===true,dv=window.__uaiDvMatched?.()===true;
  const highestVideo=resolveHighestVideo(baseVideo,{fourk,dv,hasPlaylist:index>=0});
  const originalHighestAudio=index>=0?highest.slice(index+separator.length):'確認中';
- const highestAudio=resolveHighestAudio(originalHighestAudio,{atmos:window.__uaiAtmosMatched?.()===true,dolby:window.__uaiDolbyAudioMatched?.()===true,allowHistory});
+ const highestAudio=resolveHighestAudio(originalHighestAudio,{atmos:window.__uaiAtmosMatched?.()===true,dolby:window.__uaiDolbyAudioMatched?.()===true});
  for(const el of document.querySelectorAll('.'+CLS)){
   const currentCh=currentAudio.match(/\((\d+(?:\.\d+)?ch)(?:・[^)]*)?\)/);
-  const readableCurrent=allowHistory&&/Dolby Digital(?: Plus)?/.test(currentAudio)&&currentCh?'Dolby Audio ('+currentCh[1]+' / '+currentAudio.replace(/\s*\([^)]*\)/,'')+')':currentAudio;
+  const readableCurrent=/Dolby Digital(?: Plus)?/.test(currentAudio)&&currentCh?'Dolby Audio ('+currentCh[1]+' / '+currentAudio.replace(/\s*\([^)]*\)/,'')+')':currentAudio;
   const cells={currentVideo,currentAudio:readableCurrent,highestVideo,highestAudio};
   for(const [name,value] of Object.entries(cells)){
    const cell=el.querySelector('[data-uai-cell="'+name.replace(/[A-Z]/g,x=>'-'+x.toLowerCase())+'"]');
