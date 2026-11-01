@@ -20,7 +20,7 @@ function paint(){
   if(value!==next)primary.textContent=next;
  }
  const audio=sh?.getElementById('a');
- if(audio){const base=audio.dataset.uaiBaseAudio; if(base!==undefined){const next=matches('atmos')?'Dolby Atmos':matches('audio')?'Dolby Audio':base;if(audio.textContent!==next)audio.textContent=next;}}
+ if(audio){const base=audio.dataset.uaiBaseAudio; if(base!==undefined){const next=sh.getElementById('state')?.textContent==='解析完了'?base:matches('atmos')?'Dolby Atmos':matches('audio')?'Dolby Audio':base;if(audio.textContent!==next)audio.textContent=next;}}
  const flags=String(sid())+'|'+matches('dv')+'|'+matches('fourk')+'|'+matches('atmos')+'|'+matches('audio')+'|'+enabled;
  if(lastFlags!==flags){lastFlags=flags;window.dispatchEvent(new Event('UAI_DV_UPDATED'));window.dispatchEvent(new Event('UAI_QUALITY_UPDATED'))}
 }
