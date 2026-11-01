@@ -16,7 +16,12 @@ function paint(){
   const value=primary.textContent||'';
   const base=value.replace(/ Dolby Vision$/,'');
   const isQuality=/^(?:4K UHD|Full HD|HD|[0-9]+p)$/.test(base);
-  const next=sh.getElementById('state')?.textContent==='解析完了'?base:isQuality?(matches('fourk')?'4K UHD':base)+(matches('dv')?' Dolby Vision':''):base;
+  const analyzed=sh.getElementById('state')?.textContent==='解析完了';
+  const original=primary.dataset.uaiAnalyzedVideo;
+  const parsedQuality=analyzed&&original&&/^(?:4K UHD|Full HD|HD|[0-9]+p)$/.test(original);
+  const upgrade=parsedQuality&&matches('fourk')&&original!=='4K UHD';
+  const next=parsedQuality?(upgrade?'4K UHD':original)+(matches('dv')?' Dolby Vision':''):isQuality?(matches('fourk')?'4K UHD':base)+(matches('dv')?' Dolby Vision':''):base;
+  if(parsedQuality){const sub=sh.getElementById('vs');if(sub)sub.textContent=upgrade?'':sub.dataset.uaiAnalyzedDetail||'';}
   if(value!==next)primary.textContent=next;
  }
  const audio=sh?.getElementById('a');
