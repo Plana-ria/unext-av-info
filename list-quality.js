@@ -2,7 +2,7 @@
 let enabled=false,visible=true,pending=false;
 const LABEL='uai-list-quality';
 const css=document.createElement('style');
-css.textContent='.uai-list-quality{box-sizing:border-box;width:100%;min-width:0;padding:5px 5px 7px;color:#c9dae8;font:500 11px/1.45 system-ui,sans-serif;display:grid;gap:2px;pointer-events:none;overflow-wrap:anywhere}.uai-list-quality span{display:block;white-space:normal}';
+css.textContent='.uai-list-quality{box-sizing:border-box;width:100%;min-width:0;margin-top:8px;padding:7px 0 1px;border-top:1px solid rgba(180,200,220,.2);color:#c9dae8;font:500 11px/1.45 system-ui,sans-serif;display:grid;gap:3px;pointer-events:none;overflow-wrap:anywhere}.uai-list-quality span{display:block;white-space:normal}';
 document.documentElement.append(css);
 const quality=id=>window.__uaiQualityForId?.(id)||{};
 const titleId=a=>{
@@ -13,26 +13,11 @@ const titleId=a=>{
  }catch{return null}
 };
 function tileFor(a){
- // A title link enclosing an image and the title's metadata is the stable unit.
- // Never climb into the virtualized row/grid, which contains multiple titles.
- const parent=a.parentElement;
- if(!parent||parent===document.body)return null;
- // These are isolated title cards, unlike episode thumbnails or main title artwork.
- if(parent.matches('[class*="sc-cf3b7ffa-0"]'))return parent;
- // For rails/carousels, prefer the nearest one-title tile.
- let candidate=parent;
- for(let depth=0;depth<3;depth++){
-  const outer=candidate.parentElement;
-  if(!outer||outer===document.body||outer===document.documentElement)break;
-  const ids=new Set(Array.from(outer.querySelectorAll('a[href*="/title/SID"]')).map(titleId).filter(Boolean));
-  if(ids.size!==1)break;
-  const rect=outer.getBoundingClientRect();
-  if(rect.width<90||rect.width>520||rect.height>700)break;
-  // Do not insert inside an interactive/link element.
-  if(outer.matches('a,button'))break;
-  candidate=outer;
- }
- return candidate;
+ // Put the labels inside the clickable card, beneath its built-in description.
+ // U-NEXT's grid cards have a metadata block; other one-title links can use
+ // the link itself as a safe fallback, never the external grid row.
+ const info=a.querySelector('[class*="sc-891f7a85-5"]');
+ return info||a;
 }
 function clear(){document.querySelectorAll('.'+LABEL).forEach(node=>node.remove())}
 function update(){
