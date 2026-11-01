@@ -99,4 +99,26 @@ window.addEventListener('message',async e=>{
  finally{activeQueries.delete(id)}
 });
 
+
+const dvFeatureHash='853a073696b3f87faccf8c1f134a6085f3d16706e0d037a4426707bf40bb0fe3';
+window.addEventListener('message',async e=>{
+ const m=e.data;if(e.source!==window||m?.source!=='UAI_DV_FEATURE_QUERY'||!extensionEnabled)return;
+ const id=String(m.id||''),controller=new AbortController();activeQueries.set('dv-'+id,controller);
+ const send=data=>window.postMessage({source:'UAI_DV_FEATURE_RESULT',id,data},location.origin);
+ try{
+  const all=[],seen=new Set();let pages=1;
+  for(let page=1;page<=pages&&page<=30;page++){
+   if(controller.signal.aborted||!extensionEnabled)return;
+   const data=await query('cosmo_VideoFeature',{featureCode:'FET0009245',page,pageSize:20},dvFeatureHash,controller.signal);
+   const feature=data?.webfront_feature;
+   if(feature?.id!=='FET0009245'||!feature.pageInfo||!Array.isArray(feature.titles))throw Error('特集API応答形式が一致しません');
+   if(page===1){pages=Number(feature.pageInfo.pages);if(!Number.isInteger(pages)||pages<1||pages>30)throw Error('ページ数が不正です')}
+   if(Number(feature.pageInfo.page)!==page)throw Error('ページ番号が一致しません');
+   for(const title of feature.titles){if(typeof title.id==='string'&&/^SID\d+$/.test(title.id)&&!seen.has(title.id)){seen.add(title.id);all.push(title.id)}}
+  }
+  if(!all.length)throw Error('作品IDが取得できません');
+  send({ids:all,pages});
+ }catch(err){if(!controller.signal.aborted)send({error:String(err.message||err).slice(0,160)})}
+ finally{activeQueries.delete('dv-'+id)}
+});
 })();
