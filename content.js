@@ -26,7 +26,7 @@ function setOfficialHelpLinks(parsed){
  sh.getElementById('fourk-help').hidden=!fourk;
  sh.getElementById('official-links').hidden=!(dolby||fourk);
 }
-function channel(t){const c=String(t.config||'').toUpperCase();if(c==='F801'&&/ec-3|ac-3/i.test(t.c))return '5.1ch';if(t.channels===1)return '1.0ch';if(t.channels===2)return '2.0ch';return t.channels?t.channels+'ch（構成未確認）':'構成不明'}
+function channel(t){const c=String(t.config||'').toUpperCase();if(c==='F801'&&/ec-3|ac-3/i.test(t.c))return '5.1ch';if(t.channels===1)return '1 ch';if(t.channels===2)return '2 ch';return t.channels?t.channels+'ch（構成未確認）':'構成不明'}
 function codec(s){if(/ec-3/i.test(s))return 'Dolby Digital Plus';if(/ac-3/i.test(s))return 'Dolby Digital';if(/mp4a/i.test(s))return 'AAC';if(/hvc1|hev1/i.test(s))return 'HEVC';if(/avc1/i.test(s))return 'H.264';return s||'不明'}
 function attrs(e,n){return e.getAttribute(n)}
 function mpdParse(xml){const d=new DOMParser().parseFromString(xml,'application/xml');if(d.querySelector('parsererror'))throw Error('MPD XML解析エラー');
