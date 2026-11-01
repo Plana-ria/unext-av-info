@@ -174,7 +174,7 @@ function requestTitleData(id,title,attempt){
   window.addEventListener('message',handler);window.postMessage({source:'UAI_QUERY',id:requestId,title},location.origin);
  });
 }
-async function run(title=sid()){if(!enabled||!allowTitleAnalysis||!title)return;const id=++runId,requestUrl=location.href;const valid=()=>enabled&&allowTitleAnalysis&&id===runId&&location.href===requestUrl&&sid()===title;busy=true;const links=rootOf()?.getElementById('official-links');if(links)links.hidden=true;render('照会中','確認中','音声情報を取得中','確認中','画質情報を取得中','配信情報を解析しています。','');
+async function run(title=sid()){if(!enabled||!showTitle||!allowTitleAnalysis||!title)return;rootOf()?.querySelector('details')?.removeAttribute('hidden');const id=++runId,requestUrl=location.href;const valid=()=>enabled&&showTitle&&allowTitleAnalysis&&id===runId&&location.href===requestUrl&&sid()===title;busy=true;const links=rootOf()?.getElementById('official-links');if(links)links.hidden=true;render('照会中','確認中','音声情報を取得中','確認中','画質情報を取得中','配信情報を解析しています。','');
 const fail=e=>{if(!valid())return;busy=false;const info=describeError(e);render('取得失敗','判定不能','音声情報を取得できませんでした','判定不能','画質情報を取得できませんでした',info.message,'エラー種別: '+info.kind+'\n'+info.detail)};
 try{const injected=await chrome.runtime.sendMessage({type:'INJECT'});if(injected?.error)throw Error(injected.error);
 let data;
