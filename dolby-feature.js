@@ -1,13 +1,15 @@
 (()=>{if(window.__uaiDvOfficial)return;window.__uaiDvOfficial=true;
 const TTL=24*60*60*1000,RETRY=15*60*1000;
-const specs={dv:{key:'uaiDvOfficialFeatureV2'},fourk:{key:'uai4kOfficialFeatureV1'},atmos:{key:'uaiAtmosOfficialFeatureV1'}};
-const state={dv:{cache:null,inflight:false,lastAttempt:0},fourk:{cache:null,inflight:false,lastAttempt:0},atmos:{cache:null,inflight:false,lastAttempt:0}};
+const specs={dv:{key:'uaiDvOfficialFeatureV2'},fourk:{key:'uai4kOfficialFeatureV1'},atmos:{key:'uaiAtmosOfficialFeatureV1'},audio:{key:'uaiDolbyAudioSearchV1'}};
+const state={dv:{cache:null,inflight:false,lastAttempt:0},fourk:{cache:null,inflight:false,lastAttempt:0},atmos:{cache:null,inflight:false,lastAttempt:0},audio:{cache:null,inflight:false,lastAttempt:0}};
 let enabled=false,serial=0,lastUrl=location.href,lastFlags='';
 const sid=()=>window.__uaiCurrentTitleId?.()||location.pathname.match(/SID\d+/)?.[0]||null;
 const matches=kind=>enabled&&!!state[kind].cache?.ids?.includes(sid());
 window.__uaiDvMatched=()=>matches('dv');
 window.__uai4kMatched=()=>matches('fourk');
 window.__uaiAtmosMatched=()=>matches('atmos');
+window.__uaiDolbyAudioMatched=()=>matches('audio');
+window.__uaiQualityForId=id=>{const has=kind=>enabled&&!!state[kind].cache?.ids?.includes(id);return {atmos:has('atmos'),audio:has('audio'),fourk:has('fourk'),dv:has('dv')}};
 function paint(){
  const sh=document.getElementById('unext-av-info-card')?.shadowRoot,primary=sh?.getElementById('v');
  if(primary){
@@ -18,9 +20,9 @@ function paint(){
   if(value!==next)primary.textContent=next;
  }
  const audio=sh?.getElementById('a');
- if(audio){const base=audio.dataset.uaiBaseAudio; if(base!==undefined){const next=matches('atmos')?'Dolby Atmos':base;if(audio.textContent!==next)audio.textContent=next;}}
- const flags=String(sid())+'|'+matches('dv')+'|'+matches('fourk')+'|'+matches('atmos')+'|'+enabled;
- if(lastFlags!==flags){lastFlags=flags;window.dispatchEvent(new Event('UAI_DV_UPDATED'))}
+ if(audio){const base=audio.dataset.uaiBaseAudio; if(base!==undefined){const next=matches('atmos')?'Dolby Atmos':matches('audio')?'Dolby Audio':base;if(audio.textContent!==next)audio.textContent=next;}}
+ const flags=String(sid())+'|'+matches('dv')+'|'+matches('fourk')+'|'+matches('atmos')+'|'+matches('audio')+'|'+enabled;
+ if(lastFlags!==flags){lastFlags=flags;window.dispatchEvent(new Event('UAI_DV_UPDATED'));window.dispatchEvent(new Event('UAI_QUALITY_UPDATED'))}
 }
 async function refresh(kind){
  const item=state[kind],cache=item.cache,now=Date.now();
@@ -31,11 +33,11 @@ async function refresh(kind){
   const result=await new Promise((resolve,reject)=>{
    const timer=setTimeout(()=>{window.removeEventListener('message',reply);reject(Error('一覧APIタイムアウト'))},90000);
    function reply(e){
-    if(e.source!==window||e.data?.source!=='UAI_FEATURE_RESULT'||e.data.id!==id||e.data.kind!==kind)return;
+    if(e.source!==window||!(kind==='audio'?e.data?.source==='UAI_DOLBY_SEARCH_RESULT':e.data?.source==='UAI_FEATURE_RESULT'&&e.data.kind===kind)||e.data.id!==id)return;
     clearTimeout(timer);window.removeEventListener('message',reply);resolve(e.data.data);
    }
    window.addEventListener('message',reply);
-   window.postMessage({source:'UAI_FEATURE_QUERY',id,kind},location.origin);
+   window.postMessage(kind==='audio'?{source:'UAI_DOLBY_SEARCH_QUERY',id}:{source:'UAI_FEATURE_QUERY',id,kind},location.origin);
   });
   if(result?.error)throw Error(result.error);
   const ids=result?.ids;
@@ -45,7 +47,7 @@ async function refresh(kind){
  }catch(e){console.warn('[U-NEXT AV Info] '+kind+' feature lookup:',String(e.message||e).slice(0,160))}
  finally{item.inflight=false;paint()}
 }
-function start(){if(!enabled)return;refresh('dv');refresh('fourk');refresh('atmos')}
+function start(){if(!enabled)return;refresh('dv');refresh('fourk');refresh('atmos');refresh('audio')}
 function setEnabled(v){enabled=v===true;paint();start()}
 chrome.runtime.onMessage.addListener(m=>{if(m?.type==='UAI_ENABLED_CHANGED')setEnabled(m.enabled!==false)});
 Promise.all([chrome.storage.local.get(Object.values(specs).map(s=>s.key)),chrome.runtime.sendMessage({type:'UAI_GET_ENABLED'})]).then(([stored,reply])=>{
