@@ -3,7 +3,7 @@ let enabled=true,visible=true,pending=false;
 const style=document.createElement('style');style.textContent='.uai-list-quality{padding:5px 2px 3px;color:#c9dae8;font:500 11px/1.45 system-ui,sans-serif;display:grid;gap:2px;max-width:100%;pointer-events:none}.uai-list-quality span{overflow-wrap:anywhere}';document.documentElement.append(style);
 const quality=id=>window.__uaiQualityForId?.(id)||{};
 function update(){
- if(!enabled||!visible||location.pathname.startsWith('/play/')){document.querySelectorAll('.uai-list-quality').forEach(e=>e.remove());return}
+ if(!enabled||!visible||/^\/title\/SID\d+(?:\/|$)/.test(location.pathname)||location.pathname.startsWith('/play/')){document.querySelectorAll('.uai-list-quality').forEach(e=>e.remove());return}
  const groups=new Map();
  for(const a of document.querySelectorAll('a[href*="SID"]')){
   const match=(a.getAttribute('href')||'').match(/SID\d+/);if(!match)continue;
