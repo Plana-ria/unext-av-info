@@ -47,7 +47,9 @@
       ],
       "js": [
         "content.js",
-        "playback-ui.js"
+        "playback-ui.js",
+        "dolby-feature.js",
+        "list-quality.js"
       ],
       "run_at": "document_idle"
     }
