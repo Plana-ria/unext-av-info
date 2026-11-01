@@ -87,7 +87,8 @@ function draw(){
  const enhanced=fourk&&!actual4k&&index>=0&&baseVideo!=='取得不可'&&baseVideo!=='確認中';
  const videoWith4k=enhanced?baseVideo.replace(/^(?:Full HD|HD|\d+p)/,'4K UHD'):baseVideo;
  const highestVideo=dv&&index>=0&&videoWith4k!=='取得不可'&&videoWith4k!=='確認中'?(videoWith4k.includes(' (')?videoWith4k.replace(' (',' Dolby Vision ('):videoWith4k+' Dolby Vision'):videoWith4k;
- const highestAudio=index>=0?highest.slice(index+separator.length):'確認中';
+ const originalHighestAudio=index>=0?highest.slice(index+separator.length):'確認中';
+ const highestAudio=window.__uaiAtmosMatched?.()===true?'Dolby Atmos':originalHighestAudio;
  for(const el of document.querySelectorAll('.'+CLS)){
   const cells={currentVideo,currentAudio,highestVideo,highestAudio};
   for(const [name,value] of Object.entries(cells)){
