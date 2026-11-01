@@ -1,5 +1,5 @@
 (()=>{if(window.__unextAvInfoActive)return;window.__unextAvInfoActive=true;
-const ID='unext-av-info-card';let enabled=false,allowTitleAnalysis=false;let current='',busy=false,runId=0,lastUrl=location.href,resourceSince=performance.now();
+const ID='unext-av-info-card';let enabled=false,allowTitleAnalysis=false,showTitle=true;let current='',busy=false,runId=0,lastUrl=location.href,resourceSince=performance.now();
 function sid(){const m=location.pathname.match(/SID\d+/);if(m)return m[0];if(observedTitle)return observedTitle;const a=performance.getEntriesByType('resource').filter(e=>e.startTime>=resourceSince);for(let i=a.length-1;i>=0;i--){try{const u=new URL(a[i].name);if(u.hostname!=='cc.unext.jp'||!['cosmo_getVideoTitle','cosmo_getVideoTitleEpisodes','cosmo_getVideoTitleRelatedStuffs'].includes(u.searchParams.get('operationName')))continue;const id=JSON.parse(u.searchParams.get('variables')||'{}').code;if(/^SID\d+$/.test(id))return id}catch{}}return null}
 window.__uaiCurrentTitleId=()=>sid();
 function anchor(){return [...document.querySelectorAll('h2')].find(h=>h.textContent.trim()==='キャスト・スタッフ')?.parentElement}
@@ -10,12 +10,12 @@ window.addEventListener('message',e=>{
 });
 const rootOf=()=>document.getElementById(ID)?.shadowRoot;
 function invalidate(){window.postMessage({source:'UAI_CANCEL_QUERY',id:runId},location.origin);++runId;busy=false;current='';const links=rootOf()?.getElementById('official-links');if(links)links.hidden=true;render('準備中','確認中','作品情報を待っています','確認中','作品情報を待っています','','')}
-function render(state,a,as,v,vs,note,detail){const sh=rootOf();if(!sh)return;const valid=/^(?:4K UHD|Full HD|HD|[0-9]+p)$/.test(String(v));const video=valid?(window.__uai4kMatched?.()?'4K UHD':v)+(window.__uaiDvMatched?.()?' Dolby Vision':''):v;sh.getElementById('a').dataset.uaiBaseAudio=a??'';const officialAudio=window.__uaiAtmosMatched?.()?'Dolby Atmos':a;for(const [k,value] of Object.entries({state,a:officialAudio,as,v:video,vs,note,detail}))sh.getElementById(k).textContent=value??'';sh.getElementById('note').hidden=!note;sh.getElementById('actions').hidden=state!=='取得失敗'}
+function render(state,a,as,v,vs,note,detail){const sh=rootOf();if(!sh)return;const valid=/^(?:4K UHD|Full HD|HD|[0-9]+p)$/.test(String(v));const video=valid?(window.__uai4kMatched?.()?'4K UHD':v)+(window.__uaiDvMatched?.()?' Dolby Vision':''):v;sh.getElementById('a').dataset.uaiBaseAudio=a??'';const officialAudio=window.__uaiAtmosMatched?.()?'Dolby Atmos':window.__uaiDolbyAudioMatched?.()?'Dolby Audio':a;for(const [k,value] of Object.entries({state,a:officialAudio,as:officialAudio==='Dolby Atmos'?(as&&as!=='音声情報なし'?as:''):as,v:video,vs,note,detail}))sh.getElementById(k).textContent=value??'';sh.getElementById('note').hidden=!note;sh.getElementById('actions').hidden=state!=='取得失敗'}
 function card(){const host=document.createElement('section');host.id=ID;const sh=host.attachShadow({mode:'open'});sh.innerHTML=`<style>
 :host{display:block;width:100%;margin:0 0 42px;color:#edf4fc;font:inherit}*{box-sizing:border-box}.panel{background:rgba(24,37,54,.77);border:1px solid #415264;border-radius:14px;padding:22px}header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}h2{font-size:23px;font-weight:700;color:white;margin:0}.state{font-size:12px;color:#c5d6e8}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.metric{border:1px solid #3a4e62;background:rgba(255,255,255,.04);border-radius:10px;padding:16px;min-width:0}.label{font-size:12px;color:#b5c8d9;margin-bottom:7px}.primary{font-size:21px;font-weight:700;overflow-wrap:anywhere}.sub{font-size:12px;color:#c4d2de;margin-top:5px;overflow-wrap:anywhere}.official-links[hidden],.official-links .help-link[hidden]{display:none!important}.official-links{margin-top:14px;padding-top:12px;border-top:1px solid #415264}.official-links .help-link{display:block;width:fit-content;margin-top:8px}.help-link{display:inline-block;margin-top:10px;font-size:12px;color:#9bd4ff;text-decoration:underline;text-underline-offset:2px}.help-link:hover{color:#cdeaff}.help-link:focus-visible{outline:2px solid #9bd4ff;outline-offset:3px}.note[hidden]{display:none}.note{white-space:pre-line;font-size:11px;color:#b2c1d2;margin-top:14px;line-height:1.7}details{margin-top:15px;font-size:12px;color:#c3d3df}summary{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;line-height:1.5}button{background:#29445f;border:1px solid #56718b;border-radius:7px;color:white;padding:8px 13px;cursor:pointer}#actions{margin-top:12px}#actions[hidden]{display:none!important}@media(max-width:650px){.grid{grid-template-columns:1fr}.panel{padding:15px}h2{font-size:19px}}</style>
 <div class="panel"><header><h2>音声・映像の配信情報</h2><span id="state" class="state">準備中</span></header><div class="grid">
 <div class="metric"><div class="label">音声</div><div class="primary" id="a">解析待ち</div><div class="sub" id="as">—</div></div>
-<div class="metric"><div class="label">画質</div><div class="primary" id="v">解析待ち</div><div class="sub" id="vs">—</div></div></div>
+<div class="metric"><div class="label">映像</div><div class="primary" id="v">解析待ち</div><div class="sub" id="vs">—</div></div></div>
 <div class="note" id="note"></div><div class="official-links" id="official-links" hidden><div>U-NEXT公式の対応条件</div><a id="dolby-help" class="help-link" href="https://help.unext.jp/guide/detail/what-is-dolby-audio-and-dolby-atmos" target="_blank" rel="noopener noreferrer">Dolby音声の対応条件（U-NEXT公式） ↗</a><a id="fourk-help" class="help-link" href="https://help.unext.jp/guide/detail/what-is-4k" target="_blank" rel="noopener noreferrer">4K画質の対応条件（U-NEXT公式） ↗</a></div><div id="actions" hidden><button id="retry">再取得</button></div>
 <details><summary>取得した詳細と注意事項</summary><pre id="detail"></pre></details></div>`;sh.getElementById('retry').onclick=run;return host}
 function setOfficialHelpLinks(parsed){
@@ -231,8 +231,21 @@ render('解析完了',audioMain,audioSub,videoMain,videoSub,capability.note,deta
 busy=false;
 }
 catch(e){fail(e)}}
+function safeRender(){
+ const sh=rootOf();if(!sh)return;
+ const atm=window.__uaiAtmosMatched?.()===true,dolby=window.__uaiDolbyAudioMatched?.()===true;
+ const fourk=window.__uai4kMatched?.()===true,dv=window.__uaiDvMatched?.()===true;
+ const audio=atm?'Dolby Atmos':dolby?'Dolby Audio':'2 ch';
+ const video=(fourk?'4K UHD':'Full HD 以下')+(dv?' Dolby Vision':'');
+ const note=!fourk?'＊HD / SD 画質の可能性もあります':'';
+ for(const [key,value] of Object.entries({state:'公式情報',a:audio,as:'',v:video,vs:note,note:'',detail:''}))sh.getElementById(key).textContent=value;
+ sh.getElementById('a').dataset.uaiBaseAudio=audio;
+ sh.getElementById('official-links').hidden=true;sh.getElementById('actions').hidden=true;
+ sh.querySelector('details').hidden=true;
+}
+window.addEventListener('UAI_QUALITY_UPDATED',()=>{if(enabled&&showTitle&&!allowTitleAnalysis)safeRender()});
 function attach(){
- if(!enabled||!allowTitleAnalysis){document.getElementById(ID)?.remove();return;}
+ if(!enabled||!showTitle){document.getElementById(ID)?.remove();return;}
  const target=anchor();
  if(!target){if(current)invalidate();document.getElementById(ID)?.remove();return}
  let host=document.getElementById(ID);const fresh=!host;if(!host)host=card();
@@ -243,15 +256,22 @@ function attach(){
   return;
  }
  const key=title+'|'+location.pathname;
- if(key!==current||fresh){if(current&&current!==key)invalidate();current=key;run(title)}
+ if(key!==current||fresh){if(current&&current!==key)invalidate();current=key;if(allowTitleAnalysis)run(title);else safeRender() }else if(!allowTitleAnalysis)safeRender()
 }
 function setEnabled(next){const was=enabled;enabled=next;window.postMessage({source:'UAI_SET_ENABLED',enabled},location.origin);if(!enabled){invalidate();document.getElementById(ID)?.remove()}else if(!was){observedTitle=null;resourceSince=0;window.postMessage({source:'UAI_GET_TITLE'},location.origin);schedule()}}
 chrome.runtime.onMessage.addListener(m=>{if(m?.type==='UAI_ENABLED_CHANGED')setEnabled(m.enabled!==false)});
-function setTitlePolicy(allow){const old=allowTitleAnalysis;allowTitleAnalysis=allow===true;if(!allowTitleAnalysis){invalidate();document.getElementById(ID)?.remove()}else if(!old&&enabled){current='';schedule()}}
-chrome.storage.local.get('allowTitleAnalysis').then(s=>setTitlePolicy(s.allowTitleAnalysis)).catch(()=>{});
-chrome.storage.onChanged.addListener((changes,area)=>{if(area==='local'&&changes.allowTitleAnalysis)setTitlePolicy(changes.allowTitleAnalysis.newValue)});
+function applySettings(data){
+ const was=allowTitleAnalysis,old=showTitle;
+ showTitle=data.uaiShowTitle!==false;
+ allowTitleAnalysis=data.uaiAllowHistory===true;
+ if(!showTitle){invalidate();document.getElementById(ID)?.remove();return}
+ if(was!==allowTitleAnalysis||old!==showTitle){invalidate();current='';schedule()}
+ else if(!allowTitleAnalysis)safeRender();
+}
+chrome.storage.local.get(['uaiShowTitle','uaiAllowHistory']).then(applySettings).catch(()=>{});
+chrome.storage.onChanged.addListener((changes,area)=>{if(area==='local'&&(changes.uaiShowTitle||changes.uaiAllowHistory))chrome.storage.local.get(['uaiShowTitle','uaiAllowHistory']).then(applySettings).catch(()=>{})});
 chrome.runtime.sendMessage({type:'UAI_GET_ENABLED'}).then(r=>setEnabled(r?.enabled!==false)).catch(()=>{});
-let pending=false;function schedule(){if(!enabled||!allowTitleAnalysis||pending)return;pending=true;setTimeout(()=>{pending=false;attach()},300)}
+let pending=false;function schedule(){if(!enabled||!showTitle||pending)return;pending=true;setTimeout(()=>{pending=false;attach()},300)}
 new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true});
-setInterval(()=>{if(!enabled||!allowTitleAnalysis)return;if(lastUrl!==location.href){lastUrl=location.href;resourceSince=performance.now();observedTitle=null;invalidate();window.postMessage({source:'UAI_GET_TITLE',fresh:true},location.origin);schedule()}else if(anchor()&&(!sid()||!document.getElementById(ID)))schedule()},700);
+setInterval(()=>{if(!enabled||!showTitle)return;if(lastUrl!==location.href){lastUrl=location.href;resourceSince=performance.now();observedTitle=null;invalidate();window.postMessage({source:'UAI_GET_TITLE',fresh:true},location.origin);schedule()}else if(anchor()&&(!sid()||!document.getElementById(ID)))schedule()},700);
 schedule()})();
