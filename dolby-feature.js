@@ -1,53 +1,47 @@
 (()=>{if(window.__uaiDvOfficial)return;window.__uaiDvOfficial=true;
-const KEY='uaiDvOfficialFeatureV1',TTL=24*3600*1000;
-let enabled=false,cache=null,inflight=false,lastError='',waiters=new Map(),n=0;
+const KEY='uaiDvOfficialFeatureV2',TTL=24*60*60*1000;
+let enabled=false,cache=null,inflight=false,requestId=0,lastError='';
 const sid=()=>location.pathname.match(/SID\d+/)?.[0]||null;
-const status=()=>{
+const matched=()=>enabled&&!!cache?.ids?.includes(sid());
+window.__uaiDvMatched=matched;
+function notify(){window.dispatchEvent(new Event('UAI_DV_UPDATED'))}
+function update(){
  const id=sid();
- if(!id)return '作品IDを取得できません';
- if(!enabled)return '拡張機能OFF';
- if(!cache)return lastError?'取得失敗: '+lastError:'公式特集一覧を取得中';
- return cache.ids.includes(id)?'Dolby Vision対応（公式特集掲載）':'公式特集に掲載なし（非対応とは限りません）';
-};
-function paint(){
- const id=sid(),isPlay=location.pathname.startsWith('/play/');
- document.querySelectorAll('.uai-official-dv').forEach(el=>{if(!enabled||!id||!el.isConnected)el.remove()});
- if(!enabled||!id)return;
- let anchor=isPlay?document.querySelector('.uai-playback-info'):document.getElementById('unext-av-info-card');
- if(!anchor)return;
- let box=document.querySelector('.uai-official-dv');
- if(!box){box=document.createElement('div');box.className='uai-official-dv';box.style.cssText='background:rgba(8,20,36,.92);border:1px solid #64829c;border-radius:8px;color:#fff;font:12px/1.5 sans-serif;padding:8px 10px;max-width:580px;position:relative;z-index:2';anchor.after(box)}
- box.textContent='Dolby Vision公式特集照合: '+status()+(cache?' / '+cache.ids.length+'作品 / '+new Date(cache.time).toLocaleString('ja-JP')+'取得':'');
+ const host=document.getElementById('unext-av-info-card');
+ const shadow=host?.shadowRoot;
+ const sub=shadow?.getElementById('vs');
+ if(sub){
+  let tag=shadow.getElementById('uai-dv-label');
+  if(!matched()){tag?.remove()}
+  else if(!tag){tag=document.createElement('div');tag.id='uai-dv-label';tag.textContent='Dolby Vision';tag.style.cssText='font-size:13px;font-weight:600;color:#b5dfff;margin-top:7px';sub.after(tag)}
+ }
+ notify();
 }
-async function load(force=false){
- if(!enabled||inflight)return;
- if(!force&&cache&&Date.now()-cache.time<TTL){paint();return}
- inflight=true;lastError='';paint();
+async function refresh(){
+ if(!enabled||inflight||cache&&Date.now()-cache.time<TTL)return;
+ inflight=true;lastError='';
+ const id='feature-'+(++requestId);
  try{
-  const id='dv-'+(++n),result=await new Promise((resolve,reject)=>{
-   const timer=setTimeout(()=>{waiters.delete(id);reject(Error('API応答タイムアウト（45秒）'))},45000);
-   waiters.set(id,data=>{clearTimeout(timer);waiters.delete(id);resolve(data)});
+  const response=await new Promise((resolve,reject)=>{
+   const timer=setTimeout(()=>{window.removeEventListener('message',handler);reject(Error('一覧APIタイムアウト'))},55000);
+   function handler(e){if(e.source!==window||e.data?.source!=='UAI_DV_FEATURE_RESULT'||e.data.id!==id)return;clearTimeout(timer);window.removeEventListener('message',handler);resolve(e.data.data)}
+   window.addEventListener('message',handler);
    window.postMessage({source:'UAI_DV_FEATURE_QUERY',id},location.origin);
   });
-  if(result.error)throw Error(result.error);
-  if(!Array.isArray(result.ids)||!result.ids.length)throw Error('作品一覧が空です');
-  const ids=[...new Set(result.ids.filter(s=>/^SID\d+$/.test(s)))];
-  if(!ids.length)throw Error('有効な作品IDがありません');
-  cache={ids,time:Date.now(),pages:result.pages};
+  if(response?.error)throw Error(response.error);
+  const ids=[...new Set((response.ids||[]).filter(v=>typeof v==='string'&&/^SID\d+$/.test(v)))];
+  if(!ids.length||!Number.isInteger(response.pages))throw Error('作品一覧が不完全です');
+  cache={ids,pages:response.pages,time:Date.now()};
   await chrome.storage.local.set({[KEY]:cache});
- }catch(e){lastError=String(e.message||e).slice(0,150)}
- finally{inflight=false;paint()}
+ }catch(e){lastError=String(e?.message||e).slice(0,160);console.warn('[U-NEXT AV Info] Dolby Vision feature lookup unavailable:',lastError)}
+ finally{inflight=false;update()}
 }
-window.addEventListener('message',e=>{
- if(e.source!==window||e.data?.source!=='UAI_DV_FEATURE_RESULT')return;
- waiters.get(e.data.id)?.(e.data.data);
-});
-function enabledChanged(v){enabled=v===true;paint();if(enabled)load()}
-chrome.runtime.onMessage.addListener(m=>{if(m?.type==='UAI_ENABLED_CHANGED')enabledChanged(m.enabled!==false)});
-Promise.all([chrome.storage.local.get(KEY),chrome.runtime.sendMessage({type:'UAI_GET_ENABLED'})]).then(([saved,settings])=>{
- const data=saved[KEY];if(data&&Array.isArray(data.ids)&&Number.isFinite(data.time))cache=data;
- enabledChanged(settings?.enabled!==false);
-}).catch(e=>{lastError=String(e.message||e).slice(0,120);paint()});
-let last=location.href;
-setInterval(()=>{if(location.href!==last){last=location.href;paint();if(enabled)load()}else paint()},1700);
+function setEnabled(next){enabled=next===true;update();if(enabled)refresh()}
+chrome.runtime.onMessage.addListener(m=>{if(m?.type==='UAI_ENABLED_CHANGED')setEnabled(m.enabled!==false)});
+Promise.all([chrome.storage.local.get(KEY),chrome.runtime.sendMessage({type:'UAI_GET_ENABLED'})]).then(([saved,reply])=>{
+ const savedCache=saved?.[KEY];if(savedCache&&Array.isArray(savedCache.ids)&&Number.isFinite(savedCache.time))cache=savedCache;
+ setEnabled(reply?.enabled!==false);
+}).catch(()=>{});
+let lastUrl=location.href;
+setInterval(()=>{if(location.href!==lastUrl){lastUrl=location.href;update();if(enabled)refresh()}else update()},1800);
 })();
