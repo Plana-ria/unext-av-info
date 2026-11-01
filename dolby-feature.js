@@ -1,48 +1,53 @@
 (()=>{if(window.__uaiDvOfficial)return;window.__uaiDvOfficial=true;
-const KEY='uaiDvOfficialFeatureV2',TTL=24*60*60*1000;
-let enabled=false,cache=null,inflight=false,requestId=0,lastError='';
+const TTL=24*60*60*1000,RETRY=15*60*1000;
+const specs={dv:{key:'uaiDvOfficialFeatureV2'},fourk:{key:'uai4kOfficialFeatureV1'}};
+const state={dv:{cache:null,inflight:false,lastAttempt:0},fourk:{cache:null,inflight:false,lastAttempt:0}};
+let enabled=false,serial=0,lastUrl=location.href,lastFlags='';
 const sid=()=>window.__uaiCurrentTitleId?.()||location.pathname.match(/SID\d+/)?.[0]||null;
-const matched=()=>enabled&&!!cache?.ids?.includes(sid());
-window.__uaiDvMatched=matched;
-function notify(){window.dispatchEvent(new Event('UAI_DV_UPDATED'))}
-function update(){
- const shadow=document.getElementById('unext-av-info-card')?.shadowRoot;
- const primary=shadow?.getElementById('v');
- shadow?.getElementById('uai-dv-label')?.remove();
+const matches=kind=>enabled&&!!state[kind].cache?.ids?.includes(sid());
+window.__uaiDvMatched=()=>matches('dv');
+window.__uai4kMatched=()=>matches('fourk');
+function paint(){
+ const sh=document.getElementById('unext-av-info-card')?.shadowRoot,primary=sh?.getElementById('v');
  if(primary){
   const value=primary.textContent||'';
   const base=value.replace(/ Dolby Vision$/,'');
-  const valid=/^(?:4K UHD|Full HD|HD|[0-9]+p)$/.test(base);
-  const next=matched()&&valid?base+' Dolby Vision':base;
+  const isQuality=/^(?:4K UHD|Full HD|HD|[0-9]+p)$/.test(base);
+  const next=isQuality?(matches('fourk')?'4K UHD':base)+(matches('dv')?' Dolby Vision':''):base;
   if(value!==next)primary.textContent=next;
  }
- notify();
+ const flags=String(sid())+'|'+matches('dv')+'|'+matches('fourk')+'|'+enabled;
+ if(lastFlags!==flags){lastFlags=flags;window.dispatchEvent(new Event('UAI_DV_UPDATED'))}
 }
-async function refresh(){
- if(!enabled||inflight||cache&&Date.now()-cache.time<TTL)return;
- inflight=true;lastError='';
- const id='feature-'+(++requestId);
+async function refresh(kind){
+ const item=state[kind],cache=item.cache,now=Date.now();
+ if(!enabled||item.inflight||cache&&now-cache.time<TTL||now-item.lastAttempt<RETRY)return;
+ item.inflight=true;item.lastAttempt=now;
+ const id=kind+'-'+(++serial);
  try{
-  const response=await new Promise((resolve,reject)=>{
-   const timer=setTimeout(()=>{window.removeEventListener('message',handler);reject(Error('一覧APIタイムアウト'))},55000);
-   function handler(e){if(e.source!==window||e.data?.source!=='UAI_DV_FEATURE_RESULT'||e.data.id!==id)return;clearTimeout(timer);window.removeEventListener('message',handler);resolve(e.data.data)}
-   window.addEventListener('message',handler);
-   window.postMessage({source:'UAI_DV_FEATURE_QUERY',id},location.origin);
+  const result=await new Promise((resolve,reject)=>{
+   const timer=setTimeout(()=>{window.removeEventListener('message',reply);reject(Error('一覧APIタイムアウト'))},90000);
+   function reply(e){
+    if(e.source!==window||e.data?.source!=='UAI_FEATURE_RESULT'||e.data.id!==id||e.data.kind!==kind)return;
+    clearTimeout(timer);window.removeEventListener('message',reply);resolve(e.data.data);
+   }
+   window.addEventListener('message',reply);
+   window.postMessage({source:'UAI_FEATURE_QUERY',id,kind},location.origin);
   });
-  if(response?.error)throw Error(response.error);
-  const ids=[...new Set((response.ids||[]).filter(v=>typeof v==='string'&&/^SID\d+$/.test(v)))];
-  if(!ids.length||!Number.isInteger(response.pages))throw Error('作品一覧が不完全です');
-  cache={ids,pages:response.pages,time:Date.now()};
-  await chrome.storage.local.set({[KEY]:cache});
- }catch(e){lastError=String(e?.message||e).slice(0,160);console.warn('[U-NEXT AV Info] Dolby Vision feature lookup unavailable:',lastError)}
- finally{inflight=false;update()}
+  if(result?.error)throw Error(result.error);
+  const ids=result?.ids;
+  if(!Array.isArray(ids)||!ids.length||new Set(ids).size!==ids.length||ids.some(x=>typeof x!=='string'||!/^SID\d+$/.test(x)))throw Error('作品一覧が不完全です');
+  item.cache={ids,time:Date.now(),pages:result.pages};
+  await chrome.storage.local.set({[specs[kind].key]:item.cache});
+ }catch(e){console.warn('[U-NEXT AV Info] '+kind+' feature lookup:',String(e.message||e).slice(0,160))}
+ finally{item.inflight=false;paint()}
 }
-function setEnabled(next){enabled=next===true;update();if(enabled)refresh()}
+function start(){if(!enabled)return;refresh('dv');refresh('fourk')}
+function setEnabled(v){enabled=v===true;paint();start()}
 chrome.runtime.onMessage.addListener(m=>{if(m?.type==='UAI_ENABLED_CHANGED')setEnabled(m.enabled!==false)});
-Promise.all([chrome.storage.local.get(KEY),chrome.runtime.sendMessage({type:'UAI_GET_ENABLED'})]).then(([saved,reply])=>{
- const savedCache=saved?.[KEY];if(savedCache&&Array.isArray(savedCache.ids)&&Number.isFinite(savedCache.time))cache=savedCache;
+Promise.all([chrome.storage.local.get(Object.values(specs).map(s=>s.key)),chrome.runtime.sendMessage({type:'UAI_GET_ENABLED'})]).then(([stored,reply])=>{
+ for(const kind of Object.keys(specs)){const c=stored[specs[kind].key];if(c&&Array.isArray(c.ids)&&Number.isFinite(c.time))state[kind].cache=c}
  setEnabled(reply?.enabled!==false);
-}).catch(()=>{});
-let lastUrl=location.href;
-setInterval(()=>{if(location.href!==lastUrl){lastUrl=location.href;update();if(enabled)refresh()}else update()},1800);
+}).catch(e=>console.warn('[U-NEXT AV Info] feature cache:',String(e.message||e)));
+setInterval(()=>{if(lastUrl!==location.href){lastUrl=location.href;lastFlags=''}paint();start()},1800);
 })();
