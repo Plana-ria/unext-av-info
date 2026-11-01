@@ -101,7 +101,7 @@ window.addEventListener('message',async e=>{
 
 
 const featureHash='853a073696b3f87faccf8c1f134a6085f3d16706e0d037a4426707bf40bb0fe3';
-const featureCodes={dv:'FET0009245',fourk:'FET0008865'};
+const featureCodes={dv:'FET0009245',fourk:'FET0008865',atmos:'FET0008864'};
 window.addEventListener('message',async e=>{
  const m=e.data;
  if(e.source!==window||m?.source!=='UAI_FEATURE_QUERY'||!extensionEnabled)return;
