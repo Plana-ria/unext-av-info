@@ -2,7 +2,7 @@
 let enabled=false,visible=true,pending=false;
 const LABEL='uai-list-quality';
 const css=document.createElement('style');
-css.textContent='.uai-list-quality{box-sizing:border-box;width:100%;min-width:0;margin-top:8px;padding:7px 0 1px;border-top:1px solid rgba(180,200,220,.2);color:#c9dae8;font:500 11px/1.45 system-ui,sans-serif;display:grid;gap:3px;pointer-events:none;overflow-wrap:anywhere}.uai-list-quality span{display:block;white-space:normal}';
+css.textContent='.uai-list-host{display:flex!important;flex-direction:column!important;min-height:0!important}.uai-list-host>.uai-list-quality{flex:0 0 auto!important;position:relative!important;z-index:2}.uai-list-host>[class*="sc-891f7a85-1"]{min-height:0!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important}.uai-list-quality{box-sizing:border-box;width:100%;min-width:0;margin-top:8px;padding:7px 0 1px;border-top:1px solid rgba(180,200,220,.2);color:#c9dae8;font:500 11px/1.45 system-ui,sans-serif;display:grid;gap:3px;pointer-events:none;overflow-wrap:anywhere}.uai-list-quality span{display:block;white-space:normal}';
 document.documentElement.append(css);
 const quality=id=>window.__uaiQualityForId?.(id)||{};
 const titleId=a=>{
@@ -17,9 +17,11 @@ function tileFor(a){
  // U-NEXT's grid cards have a metadata block; other one-title links can use
  // the link itself as a safe fallback, never the external grid row.
  const info=a.querySelector('[class*="sc-891f7a85-5"]');
- return info||a;
+ if(info)return info;
+ // Image-only carousel tiles: put the label inside the title link.
+ return a;
 }
-function clear(){document.querySelectorAll('.'+LABEL).forEach(node=>node.remove())}
+function clear(){document.querySelectorAll('.'+LABEL).forEach(node=>node.remove());document.querySelectorAll('.uai-list-host').forEach(node=>node.classList.remove('uai-list-host'))}
 function update(){
  if(!enabled||!visible||location.pathname.startsWith('/play/')){clear();return}
  const seen=new Map();
@@ -36,6 +38,7 @@ function update(){
   const video=(q.fourk?'4K UHD':'Full HD 以下')+(q.dv?' · Dolby Vision':'');
   let label=Array.from(tile.children).find(el=>el.classList?.contains(LABEL));
   if(!label){label=document.createElement('div');label.className=LABEL;tile.append(label)}
+  if(tile!==tile.closest('a'))tile.classList.add('uai-list-host');
   if(label.dataset.sid!==id||label.dataset.audio!==audio||label.dataset.video!==video){
    label.dataset.sid=id;label.dataset.audio=audio;label.dataset.video=video;
    const aLine=document.createElement('span'),vLine=document.createElement('span');
@@ -45,7 +48,7 @@ function update(){
  }
  // Remove detached/reused or now-ineligible labels on SPA navigation.
  for(const label of document.querySelectorAll('.'+LABEL)){
-  if(!seen.has(label.parentElement))label.remove();
+  if(!seen.has(label.parentElement)){label.parentElement?.classList.remove('uai-list-host');label.remove();}
  }
 }
 function schedule(){if(pending)return;pending=true;setTimeout(()=>{pending=false;update()},350)}
