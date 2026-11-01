@@ -2,8 +2,17 @@
 let enabled=true,visible=true,pending=false;
 const style=document.createElement('style');style.textContent='.uai-list-quality{padding:5px 2px 3px;color:#c9dae8;font:500 11px/1.45 system-ui,sans-serif;display:grid;gap:2px;max-width:100%;pointer-events:none}.uai-list-quality span{overflow-wrap:anywhere}';document.documentElement.append(style);
 const quality=id=>window.__uaiQualityForId?.(id)||{};
+function isListPage(){
+ const path=location.pathname;
+ // Opt in only on true discovery pages. Detail pages may use /browse/... routes,
+ // so excluding only /title/SID... is not sufficient.
+ if(path==='/'||/^\/(?:search|freeword|genre)(?:\/|$)/.test(path))return true;
+ if(/^\/browse\/(?:feature|ranking|genre|category|list)(?:\/|$)/.test(path))return true;
+ return false;
+}
+
 function update(){
- if(!enabled||!visible||/^\/title\/SID\d+(?:\/|$)/.test(location.pathname)||location.pathname.startsWith('/play/')){document.querySelectorAll('.uai-list-quality').forEach(e=>e.remove());return}
+ if(!enabled||!visible||!isListPage()){document.querySelectorAll('.uai-list-quality').forEach(e=>e.remove());return}
  const groups=new Map();
  for(const a of document.querySelectorAll('a[href*="SID"]')){
   const match=(a.getAttribute('href')||'').match(/SID\d+/);if(!match)continue;
