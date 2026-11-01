@@ -89,6 +89,14 @@ function resolveHighestVideo(mpdVideo,{fourk,dv,hasPlaylist=true}){
  const codec=officialUpgrade?'':(match?.[2]||'');
  return tier+(dv?' Dolby Vision':'')+(codec?' ('+codec+')':'');
 }
+function resolveHighestAudio(mpdAudio,{atmos=false,dolby=false,allowHistory=false}){
+ if(atmos||/^Dolby Atmos/.test(mpdAudio))return 'Dolby Atmos';
+ const match=mpdAudio.match(/\((\d+(?:\.\d+)?ch)(?:・[^)]*)?\)/);
+ const isDolby=/^Dolby Digital(?: Plus)?\b/.test(mpdAudio);
+ if(isDolby&&allowHistory&&match)return 'Dolby Audio ('+match[1]+' / '+mpdAudio.replace(/\s*\([^)]*\)/,'')+')';
+ if(dolby)return 'Dolby Audio';
+ return mpdAudio;
+}
 function draw(){
  const v=video(),w=v?.videoWidth||last?.video?.width||last?.track?.width||last?.stats?.width,h=v?.videoHeight||last?.video?.height||last?.track?.height;
  const currentVideo=q(w,h),currentAudio=last?.track?.audioCodec?trackAudio(last.track):(mseAudio()||'取得不可');
@@ -99,11 +107,7 @@ function draw(){
  const fourk=window.__uai4kMatched?.()===true,dv=window.__uaiDvMatched?.()===true;
  const highestVideo=resolveHighestVideo(baseVideo,{fourk,dv,hasPlaylist:index>=0});
  const originalHighestAudio=index>=0?highest.slice(index+separator.length):'確認中';
- const chMatch=originalHighestAudio.match(/\((\d+(?:\.\d+)?ch)(?:・[^)]*)?\)/);
- const isDolbyCodec=/Dolby Digital(?: Plus)?/.test(originalHighestAudio);
- const isAtmos=/^Dolby Atmos/.test(originalHighestAudio)||window.__uaiAtmosMatched?.()===true;
- const officialDolby=window.__uaiDolbyAudioMatched?.()===true;
- const highestAudio=isAtmos?'Dolby Atmos':isDolbyCodec&&chMatch&&allowHistory?'Dolby Audio ('+chMatch[1]+' / '+originalHighestAudio.replace(/\s*\([^)]*\)/,'')+')':officialDolby?'Dolby Audio':originalHighestAudio;
+ const highestAudio=resolveHighestAudio(originalHighestAudio,{atmos:window.__uaiAtmosMatched?.()===true,dolby:window.__uaiDolbyAudioMatched?.()===true,allowHistory});
  for(const el of document.querySelectorAll('.'+CLS)){
   const currentCh=currentAudio.match(/\((\d+(?:\.\d+)?ch)(?:・[^)]*)?\)/);
   const readableCurrent=allowHistory&&/Dolby Digital(?: Plus)?/.test(currentAudio)&&currentCh?'Dolby Audio ('+currentCh[1]+' / '+currentAudio.replace(/\s*\([^)]*\)/,'')+')':currentAudio;
