@@ -6,14 +6,15 @@ const matched=()=>enabled&&!!cache?.ids?.includes(sid());
 window.__uaiDvMatched=matched;
 function notify(){window.dispatchEvent(new Event('UAI_DV_UPDATED'))}
 function update(){
- const id=sid();
- const host=document.getElementById('unext-av-info-card');
- const shadow=host?.shadowRoot;
- const sub=shadow?.getElementById('vs');
- if(sub){
-  let tag=shadow.getElementById('uai-dv-label');
-  if(!matched()){tag?.remove()}
-  else if(!tag){tag=document.createElement('div');tag.id='uai-dv-label';tag.textContent='Dolby Vision';tag.style.cssText='font-size:13px;font-weight:600;color:#b5dfff;margin-top:7px';sub.after(tag)}
+ const shadow=document.getElementById('unext-av-info-card')?.shadowRoot;
+ const primary=shadow?.getElementById('v');
+ shadow?.getElementById('uai-dv-label')?.remove();
+ if(primary){
+  const value=primary.textContent||'';
+  const base=value.replace(/ Dolby Vision$/,'');
+  const valid=base!=='解析待ち'&&base!=='確認中'&&base!=='不明'&&base!=='取得不可';
+  const next=matched()&&valid?base+' Dolby Vision':base;
+  if(value!==next)primary.textContent=next;
  }
  notify();
 }
