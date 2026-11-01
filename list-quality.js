@@ -11,11 +11,20 @@ function isListPage(){
  return false;
 }
 
+function episodeOverlayOpen(){
+ // U-NEXT opens episode detail panels without necessarily changing the list URL.
+ // The site locks body scrolling while the panel is open; hide list badges there.
+ if(document.body?.style.overflow==='hidden'&&[...document.querySelectorAll('h1,h2,h3')].some(h=>/^エピソード(?:\s|$)/.test(h.textContent.trim())&&h.getClientRects().length))return true;
+ return false;
+}
 function update(){
- if(!enabled||!visible||!isListPage()){document.querySelectorAll('.uai-list-quality').forEach(e=>e.remove());return}
+ if(!enabled||!visible||!isListPage()||episodeOverlayOpen()){document.querySelectorAll('.uai-list-quality').forEach(e=>e.remove());return}
  const groups=new Map();
  for(const a of document.querySelectorAll('a[href*="SID"]')){
-  const match=(a.getAttribute('href')||'').match(/SID\d+/);if(!match)continue;
+  const match=(a.getAttribute('href')||'').match(/^\/title\/(SID\d+)(?:\/)?(?:[?#]|$)/);if(!match)continue;
+  // Require actual catalog tile links; never decorate an episode/preview thumbnail.
+  if(!a.matches('[data-testid="videoListView-title-link"],[data-component-name*="titleCard"],a[class*="sc-"]'))continue;
+  if(a.closest('[role="dialog"],[aria-modal="true"],[data-testid*="episode"],[data-testid*="Episode"]'))continue;
   const id=match[0];
   // Only use links wrapping a visible cover image; do not touch navigation or inline text links.
   if(!a.querySelector('img')||!a.getClientRects().length)continue;
@@ -32,7 +41,7 @@ function update(){
   const prior=groups.get(parent);if(!prior||prior.querySelectorAll('img').length<a.querySelectorAll('img').length)groups.set(parent,a);
  }
  for(const [parent,a] of groups){
-  const id=(a.getAttribute('href')||'').match(/SID\d+/)?.[0];if(!id)continue;
+  const id=(a.getAttribute('href')||'').match(/^\/title\/(SID\d+)/)?.[1];if(!id)continue;
   const q=quality(id);const audio=q.atmos?'Dolby Atmos':q.audio?'Dolby Audio':'2 ch';
   const video=(q.fourk?'4K UHD':'Full HD 以下')+(q.dv?' · Dolby Vision':'');
   let label=Array.from(parent.children).find(el=>el.classList?.contains('uai-list-quality'));
