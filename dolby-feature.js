@@ -18,7 +18,7 @@ function paint(){
   if(value!==next)primary.textContent=next;
  }
  const audio=sh?.getElementById('a');
- if(audio){const value=audio.textContent||'';const base=value==='Dolby Atmos (公式)'?'不明':value;const actual=base==='Dolby Atmos';const next=matches('atmos')&&!actual?'Dolby Atmos':base;if(next!==value)audio.textContent=next;}
+ if(audio){const base=audio.dataset.uaiBaseAudio; if(base!==undefined){const next=matches('atmos')?'Dolby Atmos':base;if(audio.textContent!==next)audio.textContent=next;}}
  const flags=String(sid())+'|'+matches('dv')+'|'+matches('fourk')+'|'+matches('atmos')+'|'+enabled;
  if(lastFlags!==flags){lastFlags=flags;window.dispatchEvent(new Event('UAI_DV_UPDATED'))}
 }
