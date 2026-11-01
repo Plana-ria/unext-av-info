@@ -22,15 +22,17 @@ function card(){const host=document.createElement('section');host.id=ID;const sh
 <div class="panel"><header><h2>音声・映像の配信情報</h2><span id="state" class="state">準備中</span></header><div class="grid">
 <div class="metric"><div class="label">音声</div><div class="primary" id="a">解析待ち</div><div class="sub" id="as">—</div></div>
 <div class="metric"><div class="label">映像</div><div class="primary" id="v">解析待ち</div><div class="sub" id="vs">—</div></div></div>
-<div class="note" id="note"></div><div class="official-links" id="official-links" hidden><div>U-NEXT公式の対応条件</div><a id="dolby-help" class="help-link" href="https://help.unext.jp/guide/detail/what-is-dolby-audio-and-dolby-atmos" target="_blank" rel="noopener noreferrer">Dolby音声の対応条件（U-NEXT公式） ↗</a><a id="fourk-help" class="help-link" href="https://help.unext.jp/guide/detail/what-is-4k" target="_blank" rel="noopener noreferrer">4K画質の対応条件（U-NEXT公式） ↗</a></div><div id="actions" hidden><button id="retry">再取得</button></div>
+<div class="note" id="note"></div><div class="official-links" id="official-links" hidden><div>U-NEXT公式の対応条件</div><a id="dolby-help" class="help-link" href="https://help.unext.jp/guide/detail/what-is-dolby-audio-and-dolby-atmos" target="_blank" rel="noopener noreferrer">Dolby音声の対応条件（U-NEXT公式） ↗</a><a id="fourk-help" class="help-link" href="https://help.unext.jp/guide/detail/what-is-4k" target="_blank" rel="noopener noreferrer">4K画質の対応条件（U-NEXT公式） ↗</a><a id="dv-help" class="help-link" href="https://help.unext.jp/guide/detail/what-is-dolby-vison" target="_blank" rel="noopener noreferrer">Dolby Visionの対応条件（U-NEXT公式） ↗</a></div><div id="actions" hidden><button id="retry">再取得</button></div>
 <details><summary>取得した詳細と注意事項</summary><pre id="detail"></pre></details></div>`;sh.getElementById('retry').onclick=run;return host}
 function setOfficialHelpLinks(parsed){
  const sh=rootOf();if(!sh)return;
  const dolby=parsed.aud.some(t=>/^(ec-3|ac-3)/i.test(t.c));
- const fourk=parsed.vid.some(t=>t.w>=3840&&t.h>=2160);
+ const fourk=parsed.vid.some(t=>t.w>=3840&&t.h>=2160)||window.__uai4kMatched?.()===true;
+ const dv=window.__uaiDvMatched?.()===true;
  sh.getElementById('dolby-help').hidden=!dolby;
  sh.getElementById('fourk-help').hidden=!fourk;
- sh.getElementById('official-links').hidden=!(dolby||fourk);
+ sh.getElementById('dv-help').hidden=!dv;
+ sh.getElementById('official-links').hidden=!(dolby||fourk||dv);
 }
 function channel(t){const c=String(t.config||'').toUpperCase();if(c==='F801'&&/ec-3|ac-3/i.test(t.c))return '5.1ch';if(t.channels===1)return '1 ch';if(t.channels===2)return '2 ch';return t.channels?t.channels+'ch（構成未確認）':'構成不明'}
 function codec(s){if(/ec-3/i.test(s))return 'Dolby Digital Plus';if(/ac-3/i.test(s))return 'Dolby Digital';if(/mp4a/i.test(s))return 'AAC';if(/hvc1|hev1/i.test(s))return 'HEVC';if(/avc1/i.test(s))return 'H.264';return s||'不明'}
@@ -241,9 +243,11 @@ function setOfficialHelpLinksFromFeatures(){
  const sh=rootOf();if(!sh)return;
  const dolby=window.__uaiAtmosMatched?.()===true||window.__uaiDolbyAudioMatched?.()===true;
  const fourk=window.__uai4kMatched?.()===true;
+ const dv=window.__uaiDvMatched?.()===true;
  sh.getElementById('dolby-help').hidden=!dolby;
  sh.getElementById('fourk-help').hidden=!fourk;
- sh.getElementById('official-links').hidden=!(dolby||fourk);
+ sh.getElementById('dv-help').hidden=!dv;
+ sh.getElementById('official-links').hidden=!(dolby||fourk||dv);
 }
 function safeRender(){
  const sh=rootOf();if(!sh)return;
