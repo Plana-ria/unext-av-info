@@ -78,7 +78,7 @@ async function loadPlaylistHighest(){
 // Only keep codec details if they describe the selected resolution tier.
 // An official 4K listing does not establish the codec of its 4K stream.
 function resolveHighestVideo(mpdVideo,{fourk,dv,hasPlaylist=true}){
- const match=/^(4K UHD|Full HD|HD|\\d+p)(?:\\s*\\(([^)]*)\\))?$/.exec(mpdVideo);
+ const match=/^(4K UHD|Full HD|HD|\d+p)(?:\s*\(([^)]*)\))?$/.exec(mpdVideo);
  const mpdTier=match?.[1]||null;
  const officialUpgrade=fourk&&mpdTier!== '4K UHD';
  let tier=officialUpgrade?'4K UHD':mpdTier;
