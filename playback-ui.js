@@ -81,7 +81,8 @@ function draw(){
  const highest=playlistHighest;
  const separator=' · 音声 ';
  const index=highest?.indexOf(separator)??-1;
- const highestVideo=(index>=0?highest.slice(0,index).replace(/^映像 /,''):'確認中')+(window.__uaiDvMatched?.()?' Dolby Vision':'');
+ const baseVideo=index>=0?highest.slice(0,index).replace(/^映像 /,''):'確認中';
+ const highestVideo=window.__uaiDvMatched?.()&&index>=0?(baseVideo.includes(' (')?baseVideo.replace(' (',' Dolby Vision ('):baseVideo+' Dolby Vision'):baseVideo;
  const highestAudio=index>=0?highest.slice(index+separator.length):'確認中';
  for(const el of document.querySelectorAll('.'+CLS)){
   const cells={currentVideo,currentAudio,highestVideo,highestAudio};
