@@ -1,5 +1,5 @@
 (()=>{if(window.__uaiPlaybackUi)return;window.__uaiPlaybackUi=true;
-const CLS='uai-playback-info';let enabled=false,playlistHighest=null,playlistBusy=false,playlistKey='',playlistAttempts=0,playlistGeneration=0;let serial=0,waiting=false,last=null,lastReply=0,lastPath='';
+const CLS='uai-playback-info';let enabled=false,dvDiagnostic='確認中',playlistHighest=null,playlistBusy=false,playlistKey='',playlistAttempts=0,playlistGeneration=0;let serial=0,waiting=false,last=null,lastReply=0,lastPath='';
 function q(w,h){return !w||!h?'取得不可':h>=2160?'4K UHD':h>=1080?'Full HD':h>=720?'HD':h+'p'}
 function audio(t,ch){const name=/ec-3/i.test(t)?'Dolby Digital Plus':/ac-3/i.test(t)?'Dolby Digital':/mp4a/i.test(t)?'AAC':'音声形式不明';return name+' ('+(ch===2?'2.0ch':ch===1?'1.0ch':ch===6?'5.1ch':ch?ch+'ch・配置未確認':'ch未確認')+')'}
 function trackAudio(t){if(!t?.audioCodec)return '取得不可';return audio(t.audioCodec,t.channelsCount)}
@@ -18,6 +18,7 @@ function mount(){
   el.querySelector('[data-uai-cell="audio-head"]').textContent='音声';
   el.querySelector('[data-uai-cell="current-label"]').textContent='現在品質';
   el.querySelector('[data-uai-cell="highest-label"]').textContent='最高品質';
+  const diagnostic=document.createElement('span');diagnostic.dataset.uaiCell='dv-diagnostic';diagnostic.style.cssText='grid-column:1/-1;font-size:.92em;color:#b3bfcd;white-space:nowrap';diagnostic.textContent='DV検証：確認中';el.append(diagnostic);
   parent.after(el);
  }
  draw();
@@ -37,7 +38,7 @@ function highestQuality(){
 }
 function resetPlaylist(){
  if(playlistBusy)window.postMessage({source:'UAI_CANCEL_PLAYBACK_QUERY',id:playlistKey+'|'+playlistGeneration},location.origin);
- playlistGeneration++;playlistBusy=false;playlistHighest=null;playlistKey='';playlistAttempts=0;
+ playlistGeneration++;playlistBusy=false;playlistHighest=null;dvDiagnostic='確認中';playlistKey='';playlistAttempts=0;
 }
 async function loadPlaylistHighest(){
  if(!enabled||!location.pathname.startsWith('/play/')||playlistBusy)return;
@@ -63,6 +64,8 @@ async function loadPlaylistHighest(){
   const summary=await analyze(result.mpds,valid);
   if(!valid())return;
   playlistHighest='映像 '+summary.video+' · 音声 '+summary.audio;
+  dvDiagnostic=summary.dolbyVision+(summary.dvIndicators?.length?' / '+summary.dvIndicators.join('; '):'');
+  console.info('[U-NEXT AV Info DV test]',{status:summary.dolbyVision,indicators:summary.dvIndicators,videoCodecs:summary.dvCodecs});
   draw();
  }catch(e){
   if(!valid())return;
@@ -70,6 +73,7 @@ async function loadPlaylistHighest(){
   const temporary=/タイムアウト|通信|network|fetch|HTTP 5\\d\\d/i.test(String(e?.message||e));
   if(!temporary||playlistAttempts>=2)playlistAttempts=2;
   playlistHighest=playlistAttempts>=2?'映像 取得不可 · 音声 取得不可':null;
+  if(playlistHighest)dvDiagnostic='取得不可';
   if(!playlistHighest)setTimeout(()=>{if(valid())loadPlaylistHighest()},1200);
   draw();
  }finally{if(valid())playlistBusy=false}
@@ -84,6 +88,7 @@ function draw(){
  const highestVideo=index>=0?highest.slice(0,index).replace(/^映像 /,''):'確認中';
  const highestAudio=index>=0?highest.slice(index+separator.length):'確認中';
  for(const el of document.querySelectorAll('.'+CLS)){
+  const dv=el.querySelector('[data-uai-cell="dv-diagnostic"]');if(dv)dv.textContent='DV検証：'+dvDiagnostic;
   const cells={currentVideo,currentAudio,highestVideo,highestAudio};
   for(const [name,value] of Object.entries(cells)){
    const cell=el.querySelector('[data-uai-cell="'+name.replace(/[A-Z]/g,x=>'-'+x.toLowerCase())+'"]');
