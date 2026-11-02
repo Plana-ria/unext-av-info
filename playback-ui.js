@@ -72,7 +72,7 @@ async function loadPlaylistHighest(){
   playlistHighest=playlistAttempts>=2?'映像 取得不可 · 音声 取得不可':null;
   if(!playlistHighest)setTimeout(()=>{if(valid())loadPlaylistHighest()},1200);
   draw();
- }finally{if(valid())playlistBusy=false}
+ }finally{window.postMessage({source:'UAI_RELEASE_PROBE_SESSION',id},location.origin);if(valid())playlistBusy=false}
 }
 
 // Only keep codec details if they describe the selected resolution tier.
