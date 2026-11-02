@@ -26,7 +26,7 @@ function setMetric(kind,main,sub,official,diff){
  const analyzedValue=sh.getElementById(kind+'-analyzed');
  comparison.hidden=!diff;
  primary.hidden=diff;subtitle.hidden=diff;
- if(diff){officialValue.textContent=official;analyzedValue.textContent=main+(sub?' / '+sub:'');}
+ if(diff){officialValue.textContent=official;analyzedValue.textContent=kind==='a'&&sub==='AAC'&&/^音声 \((.+)\)$/.test(main)?'AAC / '+main.match(/^音声 \((.+)\)$/)[1]:main+(sub?' / '+sub:'');}
  else{primary.textContent=main??'';subtitle.textContent=sub??'';}
 }
 const audioMain=analyzed?(audioDiff?null:officialAudio&&(!actualDolby&&!actualAtmos)?officialAudio:a):officialAudio||a;
