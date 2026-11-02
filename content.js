@@ -10,25 +10,42 @@ window.addEventListener('message',e=>{
 });
 const rootOf=()=>document.getElementById(ID)?.shadowRoot;
 function invalidate(){window.postMessage({source:'UAI_CANCEL_QUERY',id:runId},location.origin);++runId;busy=false;current='';const links=rootOf()?.getElementById('official-links');if(links)links.hidden=true;render('準備中','確認中','作品情報を待っています','確認中','作品情報を待っています','','')}
-function render(state,a,as,v,vs,note,detail){const sh=rootOf();if(!sh)return;const valid=/^(?:4K UHD|Full HD|HD|[0-9]+p)$/.test(String(v));const official4k=window.__uai4kMatched?.()===true,officialDv=window.__uaiDvMatched?.()===true;
+function render(state,a,as,v,vs,note,detail){const sh=rootOf();if(!sh)return;
 const analyzed=state==='解析完了'&&allowTitleAnalysis;
-const upgraded=analyzed&&official4k&&valid&&v!=='4K UHD';
-const video=(analyzed?(upgraded?'4K UHD':v):valid&&official4k?'4K UHD':v)+(officialDv&&valid?' Dolby Vision':'');
-const videoDetail=upgraded?'':vs;
+const officialAtmos=window.__uaiAtmosMatched?.()===true,officialDolby=window.__uaiDolbyAudioMatched?.()===true;
+const official4k=window.__uai4kMatched?.()===true,officialDv=window.__uaiDvMatched?.()===true;
+const officialAudio=officialAtmos?'Dolby Atmos':officialDolby?'Dolby Audio':null;
+const officialVideo=official4k?'4K UHD'+(officialDv?' Dolby Vision':''):officialDv?'Dolby Vision':null;
+const actualDolby=/^Dolby Audio\b/.test(a),actualAtmos=a==='Dolby Atmos';
+const audioDiff=analyzed&&!!officialAudio&&(officialAtmos?!actualAtmos:!(actualDolby||actualAtmos))&&a!=='不明';
+const videoDiff=analyzed&&official4k&&/^(?:Full HD|HD|[0-9]+p)$/.test(String(v));
+function setMetric(kind,main,sub,official,diff){
+ const primary=sh.getElementById(kind),subtitle=sh.getElementById(kind+'s');
+ const comparison=sh.getElementById(kind+'-comparison');
+ const officialValue=sh.getElementById(kind+'-official');
+ const analyzedValue=sh.getElementById(kind+'-analyzed');
+ comparison.hidden=!diff;
+ primary.hidden=diff;subtitle.hidden=diff;
+ if(diff){officialValue.textContent=official;analyzedValue.textContent=main+(sub?' / '+sub:'');}
+ else{primary.textContent=main??'';subtitle.textContent=sub??'';}
+}
+const audioMain=analyzed?(audioDiff?null:officialAudio&&(!actualDolby&&!actualAtmos)?officialAudio:a):officialAudio||a;
+const videoMain=analyzed?(videoDiff?null:official4k&&v==='4K UHD'?'4K UHD'+(officialDv?' Dolby Vision':''):v):official4k&&/^(?:4K UHD|Full HD|HD|[0-9]+p)$/.test(String(v))?'4K UHD'+(officialDv?' Dolby Vision':''):v;
+setMetric('a',audioMain??a,as,officialAudio,audioDiff);
+setMetric('v',videoMain??v,vs,officialVideo,videoDiff);
 sh.getElementById('v').dataset.uaiAnalyzedVideo=analyzed?v:'';
 sh.getElementById('vs').dataset.uaiAnalyzedDetail=analyzed?vs:'';
 sh.getElementById('a').dataset.uaiBaseAudio=a??'';
 sh.getElementById('as').dataset.uaiAnalyzedAudioSub=analyzed?as:'';
-const officialAtmos=window.__uaiAtmosMatched?.()===true,officialDolby=window.__uaiDolbyAudioMatched?.()===true;
-const mpdDolby=analyzed&&/^Dolby Audio \(/.test(a);
-const officialAudio=officialAtmos||analyzed&&a==='Dolby Atmos'?'Dolby Atmos':mpdDolby?a:officialDolby?'Dolby Audio':a;
-const audioDetail=officialAudio==='Dolby Atmos'||analyzed&&officialDolby&&!mpdDolby?'':as;
-for(const [k,value] of Object.entries({state,a:officialAudio,as:audioDetail,v:video,vs:videoDetail,note,detail}))sh.getElementById(k).textContent=value??'';sh.getElementById('note').hidden=!note;sh.getElementById('actions').hidden=state!=='取得失敗'}
+for(const [k,value] of Object.entries({state,note,detail}))sh.getElementById(k).textContent=value??'';
+sh.getElementById('note').hidden=!note;
+sh.getElementById('actions').hidden=state!=='取得失敗';
+}
 function card(){const host=document.createElement('section');host.id=ID;const sh=host.attachShadow({mode:'open'});sh.innerHTML=`<style>
-:host{display:block;width:100%;margin:0 0 42px;color:#edf4fc;font:inherit}*{box-sizing:border-box}.panel{background:rgba(24,37,54,.77);border:1px solid #415264;border-radius:14px;padding:22px}header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}h2{font-size:23px;font-weight:700;color:white;margin:0}.state{font-size:12px;color:#c5d6e8}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.metric{border:1px solid #3a4e62;background:rgba(255,255,255,.04);border-radius:10px;padding:16px;min-width:0}.label{font-size:12px;color:#b5c8d9;margin-bottom:7px}.primary{font-size:21px;font-weight:700;overflow-wrap:anywhere}.sub{font-size:12px;color:#c4d2de;margin-top:5px;overflow-wrap:anywhere}.official-links[hidden],.official-links .help-link[hidden]{display:none!important}.official-links{margin-top:14px;padding-top:12px;border-top:1px solid #415264}.official-links .help-link{display:block;width:fit-content;margin-top:8px}.help-link{display:inline-block;margin-top:10px;font-size:12px;color:#9bd4ff;text-decoration:underline;text-underline-offset:2px}.help-link:hover{color:#cdeaff}.help-link:focus-visible{outline:2px solid #9bd4ff;outline-offset:3px}.note[hidden]{display:none}.note{white-space:pre-line;font-size:11px;color:#b2c1d2;margin-top:14px;line-height:1.7}details{margin-top:15px;font-size:12px;color:#c3d3df}summary{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;line-height:1.5}button{background:#29445f;border:1px solid #56718b;border-radius:7px;color:white;padding:8px 13px;cursor:pointer}#actions{margin-top:12px}#actions[hidden]{display:none!important}@media(max-width:650px){.grid{grid-template-columns:1fr}.panel{padding:15px}h2{font-size:19px}}</style>
+:host{display:block;width:100%;margin:0 0 42px;color:#edf4fc;font:inherit}*{box-sizing:border-box}.panel{background:rgba(24,37,54,.77);border:1px solid #415264;border-radius:14px;padding:22px}header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}h2{font-size:23px;font-weight:700;color:white;margin:0}.state{font-size:12px;color:#c5d6e8}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.metric{border:1px solid #3a4e62;background:rgba(255,255,255,.04);border-radius:10px;padding:16px;min-width:0}.label{font-size:12px;color:#b5c8d9;margin-bottom:7px}.primary{font-size:21px;font-weight:700;overflow-wrap:anywhere}.sub{font-size:12px;color:#c4d2de;margin-top:5px;overflow-wrap:anywhere}.comparison[hidden],.primary[hidden],.sub[hidden]{display:none!important}.comparison-label{font-size:11px;color:#b5c8d9;margin-bottom:4px}.comparison-value{font-size:19px;font-weight:700;overflow-wrap:anywhere}.comparison-divider{border-top:1px solid #415264;margin:12px 0}.comparison-warning{font-size:11px;color:#e7bb70;margin-top:11px}.official-links[hidden],.official-links .help-link[hidden]{display:none!important}.official-links{margin-top:14px;padding-top:12px;border-top:1px solid #415264}.official-links .help-link{display:block;width:fit-content;margin-top:8px}.help-link{display:inline-block;margin-top:10px;font-size:12px;color:#9bd4ff;text-decoration:underline;text-underline-offset:2px}.help-link:hover{color:#cdeaff}.help-link:focus-visible{outline:2px solid #9bd4ff;outline-offset:3px}.note[hidden]{display:none}.note{white-space:pre-line;font-size:11px;color:#b2c1d2;margin-top:14px;line-height:1.7}details{margin-top:15px;font-size:12px;color:#c3d3df}summary{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;line-height:1.5}button{background:#29445f;border:1px solid #56718b;border-radius:7px;color:white;padding:8px 13px;cursor:pointer}#actions{margin-top:12px}#actions[hidden]{display:none!important}@media(max-width:650px){.grid{grid-template-columns:1fr}.panel{padding:15px}h2{font-size:19px}}</style>
 <div class="panel"><header><h2>音声・映像の配信情報</h2><span id="state" class="state">準備中</span></header><div class="grid">
-<div class="metric"><div class="label">音声</div><div class="primary" id="a">解析待ち</div><div class="sub" id="as">—</div></div>
-<div class="metric"><div class="label">映像</div><div class="primary" id="v">解析待ち</div><div class="sub" id="vs">—</div></div></div>
+<div class="metric"><div class="label">音声</div><div class="primary" id="a">解析待ち</div><div class="sub" id="as">—</div><div class="comparison" id="a-comparison" hidden><div class="comparison-label">公式情報</div><div class="comparison-value" id="a-official"></div><div class="comparison-divider"></div><div class="comparison-label">解析結果</div><div class="comparison-value" id="a-analyzed"></div><div class="comparison-warning">公式情報と解析結果が一致しません</div></div></div>
+<div class="metric"><div class="label">映像</div><div class="primary" id="v">解析待ち</div><div class="sub" id="vs">—</div><div class="comparison" id="v-comparison" hidden><div class="comparison-label">公式情報</div><div class="comparison-value" id="v-official"></div><div class="comparison-divider"></div><div class="comparison-label">解析結果</div><div class="comparison-value" id="v-analyzed"></div><div class="comparison-warning">公式情報と解析結果が一致しません</div></div></div></div>
 <div class="note" id="note"></div><div class="official-links" id="official-links" hidden><div>U-NEXT公式の対応条件</div><a id="dolby-help" class="help-link" href="https://help.unext.jp/guide/detail/what-is-dolby-audio-and-dolby-atmos" target="_blank" rel="noopener noreferrer">Dolby音声の対応条件（U-NEXT公式） ↗</a><a id="fourk-help" class="help-link" href="https://help.unext.jp/guide/detail/what-is-4k" target="_blank" rel="noopener noreferrer">4K画質の対応条件（U-NEXT公式） ↗</a><a id="dv-help" class="help-link" href="https://help.unext.jp/guide/detail/what-is-dolby-vison" target="_blank" rel="noopener noreferrer">Dolby Visionの対応条件（U-NEXT公式） ↗</a></div><div id="actions" hidden><button id="retry">再取得</button></div>
 <details><summary>取得した詳細と注意事項</summary><pre id="detail"></pre></details></div>`;sh.getElementById('retry').onclick=run;return host}
 function setOfficialHelpLinks(parsed){
@@ -245,7 +262,7 @@ if(!valid())return;
 const official4k=window.__uai4kMatched?.()===true;
 const mpd4k=vid.some(t=>t.w>=3840&&t.h>=2160);
 const needs4kCaution=official4k&&!mpd4k;
-const videoCaution=needs4kCaution?'画質：公式情報では4K UHD対応作品ですが、取得できたMPDには4Kの配信候補がなく、この環境での4K再生可否は確認できませんでした。':'';
+const videoCaution=needs4kCaution?'※端末によって取得できる配信品質は異なります。':'';
 const finalNote=[videoCaution,capability.note].filter(Boolean).join('\n');
 render('解析完了',audioMain,audioSub,videoMain,videoSub,finalNote,detail+'\n再生対応判定: '+capability.detail);
 busy=false;
