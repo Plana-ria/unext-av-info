@@ -81,6 +81,42 @@ function sid(){const m=location.pathname.match(/SID\d+/);if(m)return m[0];if(obs
 async function query(op,variables,hash,signal){const r=await awaitRoute(signal),u=new URL('https://cc.unext.jp/');u.searchParams.set('zxuid',r.uid);u.searchParams.set('zxemp',r.emp);u.searchParams.set('operationName',op);u.searchParams.set('variables',JSON.stringify(variables));u.searchParams.set('extensions',JSON.stringify({persistedQuery:{version:1,sha256Hash:hash}}));
 const version=(window.__NEXT_DATA__?.props?.pageProps?._sentryBaggage?.match(/sentry-release=([^,]+)/)?.[1]||'v130.1-prod-102c043').replace(/[^\w.-]/g,'');
 const response=await fetch(u.href,{credentials:'include',signal,headers:{accept:'*/*','content-type':'application/json','apollographql-client-name':'cosmo','apollographql-client-version':version}});if(!response.ok)throw Error(op+' HTTP '+response.status);const body=await response.json();if(body.errors?.length)throw Error(op+': '+body.errors.map(e=>e.message).join('; ').slice(0,150));return body.data}
+// Track only sessions created by the extension's title-page quality probe.
+// Never close an actual U-NEXT player session.
+const probeSessions=new Map();
+async function stopProbeSession(session){
+ if(session.stopping)return session.stopping;
+ clearTimeout(session.timer);
+ session.stopping=(async()=>{
+  const url=new URL('https://beacon.unext.jp/beacon/stop/'+encodeURIComponent(session.movieId)+'/0/');
+  url.searchParams.set('play_token',session.playToken);
+  url.searchParams.set('last_viewing_flg','0');
+  try{
+   const response=await fetch(url.href,{credentials:'include',cache:'no-store',keepalive:true});
+   const body=await response.json().catch(()=>null);
+   if(!response.ok||body?.result?.status!=='200')throw Error('停止通知が正常に受理されませんでした');
+  }catch(error){
+   // Do not expose playback tokens in logs or persist them in extension storage.
+   console.warn('[UAI] 品質調査セッションの終了通知に失敗:',String(error.message||error));
+  }finally{probeSessions.delete(session.id)}
+ })();
+ return session.stopping;
+}
+function registerProbeSession(id,info){
+ const playToken=info?.playToken,movieId=info?.urlInfo?.find(x=>/^MEZ\\d+$/.test(x?.code||''))?.code;
+ if(typeof playToken!=='string'||! /^[a-f0-9-]{36}$/i.test(playToken)||!movieId)return;
+ const session={id,playToken,movieId,timer:null,stopping:null};
+ probeSessions.set(id,session);
+ // Safety fallback for tab navigation, lost messages, or an interrupted analysis.
+ session.timer=setTimeout(()=>stopProbeSession(session),90000);
+}
+window.addEventListener('message',e=>{
+ if(e.source!==window||e.data?.source!=='UAI_RELEASE_PROBE_SESSION')return;
+ const prefix=String(e.data.id||'');
+ for(const [id,session] of probeSessions)if(id.startsWith(prefix+'-'))void stopProbeSession(session);
+});
+window.addEventListener('pagehide',()=>{for(const session of probeSessions.values())void stopProbeSession(session)});
+
 const activeQueries=new Map();
 window.addEventListener('message',e=>{if(e.source!==window||e.data?.source!=='UAI_SET_ENABLED')return;extensionEnabled=e.data.enabled===true;if(!extensionEnabled){for(const controller of activeQueries.values())controller.abort();activeQueries.clear()}});
 window.addEventListener('message',e=>{if(e.source!==window||e.data?.source!=='UAI_CANCEL_QUERY')return;const id=String(e.data.id||'');for(const [key,controller] of activeQueries){if(key.startsWith(id+'-')){controller.abort();activeQueries.delete(key)}}});
@@ -92,6 +128,7 @@ let ep=location.pathname.match(/ED\d+/)?.[0];if(!ep){const x=await query('cosmo_
 if(!stillCurrent())return;
 if(!ep)throw Error('エピソードIDを取得できません');
 const x=await query('cosmo_getPlaylistUrl',{code:ep,playMode:'caption',bitrateLow:1500,bitrateHigh:null,validationOnly:false},hashes.playlist,controller.signal),info=x?.webfront_playlistUrl;if(!info)throw Error('プレイリスト情報がありません');
+registerProbeSession(String(id),info);
 if(!stillCurrent())return;
 const profiles=(info.urlInfo||[]).flatMap(x=>x.movieProfile||[]);
 const mpds=profiles.map(p=>p.playlistUrl).filter(s=>typeof s==='string'&&s.includes('.mpd')).map(s=>{const u=new URL(s);if(info.playToken)u.searchParams.set('play_token',info.playToken);return u.href});
