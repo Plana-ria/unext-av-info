@@ -119,7 +119,12 @@ function registerProbeSession(id,info){
 window.addEventListener('message',e=>{
  if(e.source!==window||e.data?.source!=='UAI_RELEASE_PROBE_SESSION')return;
  const id=String(e.data.id||'');
- const session=probeSessions.get(id);if(session)void stopProbeSession(session);
+ if(!id)return;
+ // Title-page requests have attempt suffixes ("runId-attempt"), while
+ // playback-page requests use their full ID. Release every matching attempt.
+ for(const [key,session] of probeSessions){
+  if(key===id||key.startsWith(id+'-'))void stopProbeSession(session);
+ }
 });
 window.addEventListener('pagehide',()=>{for(const session of probeSessions.values())void stopProbeSession(session)});
 
