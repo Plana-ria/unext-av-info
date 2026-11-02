@@ -88,22 +88,28 @@ async function stopProbeSession(session){
  if(session.stopping)return session.stopping;
  clearTimeout(session.timer);
  session.stopping=(async()=>{
-  const url=new URL('https://beacon.unext.jp/beacon/stop/'+encodeURIComponent(session.movieId)+'/0/');
-  url.searchParams.set('play_token',session.playToken);
-  url.searchParams.set('last_viewing_flg','0');
-  try{
+  async function notify(kind){
+   const url=new URL('https://beacon.unext.jp/beacon/'+kind+'/'+encodeURIComponent(session.movieId)+'/0/');
+   url.searchParams.set('play_token',session.playToken);
+   if(kind==='stop')url.searchParams.set('last_viewing_flg','0');
    const response=await fetch(url.href,{credentials:'include',cache:'no-store',keepalive:true});
    const body=await response.json().catch(()=>null);
-   if(!response.ok||body?.result?.status!=='200')throw Error('停止通知が正常に受理されませんでした');
+   if(!response.ok||body?.result?.status!=='200')throw Error(kind+' 通知が受理されませんでした');
+  }
+  try{
+   // Mirror the observed pause -> close flow; do not skip stop if pause fails.
+   try{await notify('interruption')}
+   catch(error){console.warn('[UAI] 一時停止通知に失敗:',String(error.message||error))}
+   await notify('stop');
   }catch(error){
-   // Do not expose playback tokens in logs or persist them in extension storage.
+   // Never log or persist playback tokens.
    console.warn('[UAI] 品質調査セッションの終了通知に失敗:',String(error.message||error));
   }finally{probeSessions.delete(session.id)}
  })();
  return session.stopping;
 }
 function registerProbeSession(id,info){
- const playToken=info?.playToken,movieId=info?.urlInfo?.find(x=>/^MEZ\\d+$/.test(x?.code||''))?.code;
+ const playToken=info?.playToken,movieId=info?.urlInfo?.find(x=>/^MEZ\d+$/.test(x?.code||''))?.code;
  if(typeof playToken!=='string'||! /^[a-f0-9-]{36}$/i.test(playToken)||!movieId)return;
  const session={id,playToken,movieId,timer:null,stopping:null};
  probeSessions.set(id,session);
