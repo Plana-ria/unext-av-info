@@ -81,7 +81,7 @@ function sid(){const m=location.pathname.match(/SID\d+/);if(m)return m[0];if(obs
 async function query(op,variables,hash,signal){const r=await awaitRoute(signal),u=new URL('https://cc.unext.jp/');u.searchParams.set('zxuid',r.uid);u.searchParams.set('zxemp',r.emp);u.searchParams.set('operationName',op);u.searchParams.set('variables',JSON.stringify(variables));u.searchParams.set('extensions',JSON.stringify({persistedQuery:{version:1,sha256Hash:hash}}));
 const version=(window.__NEXT_DATA__?.props?.pageProps?._sentryBaggage?.match(/sentry-release=([^,]+)/)?.[1]||'v130.1-prod-102c043').replace(/[^\w.-]/g,'');
 const response=await fetch(u.href,{credentials:'include',signal,headers:{accept:'*/*','content-type':'application/json','apollographql-client-name':'cosmo','apollographql-client-version':version}});if(!response.ok)throw Error(op+' HTTP '+response.status);const body=await response.json();if(body.errors?.length)throw Error(op+': '+body.errors.map(e=>e.message).join('; ').slice(0,150));return body.data}
-// Track only sessions created by the extension's title-page quality probe.
+// Track sessions created by extension quality probes on title and playback pages.
 // Never close an actual U-NEXT player session.
 const probeSessions=new Map();
 async function stopProbeSession(session){
@@ -112,13 +112,13 @@ function registerProbeSession(id,info){
 }
 window.addEventListener('message',e=>{
  if(e.source!==window||e.data?.source!=='UAI_RELEASE_PROBE_SESSION')return;
- const prefix=String(e.data.id||'');
- for(const [id,session] of probeSessions)if(id.startsWith(prefix+'-'))void stopProbeSession(session);
+ const id=String(e.data.id||'');
+ const session=probeSessions.get(id);if(session)void stopProbeSession(session);
 });
 window.addEventListener('pagehide',()=>{for(const session of probeSessions.values())void stopProbeSession(session)});
 
 const activeQueries=new Map();
-window.addEventListener('message',e=>{if(e.source!==window||e.data?.source!=='UAI_SET_ENABLED')return;extensionEnabled=e.data.enabled===true;if(!extensionEnabled){for(const controller of activeQueries.values())controller.abort();activeQueries.clear()}});
+window.addEventListener('message',e=>{if(e.source!==window||e.data?.source!=='UAI_SET_ENABLED')return;extensionEnabled=e.data.enabled===true;if(!extensionEnabled){for(const controller of activeQueries.values())controller.abort();activeQueries.clear();for(const session of probeSessions.values())void stopProbeSession(session)}});
 window.addEventListener('message',e=>{if(e.source!==window||e.data?.source!=='UAI_CANCEL_QUERY')return;const id=String(e.data.id||'');for(const [key,controller] of activeQueries){if(key.startsWith(id+'-')){controller.abort();activeQueries.delete(key)}}});
 window.addEventListener('message',async e=>{const m=e.data;if(e.source!==window||m?.source!=='UAI_QUERY'||!extensionEnabled)return;const id=m.id;const controller=new AbortController();activeQueries.set(String(id),controller);const send=data=>window.postMessage({source:'UAI_RESULT',id,data},location.origin);
 try{const title=m.title;if(!/^SID\d+$/.test(title||''))throw Error('作品IDを検出できません');
@@ -137,6 +137,7 @@ send({title,ep,mpds:mpds.slice(0,3),codecs:[...new Set(profiles.flatMap(p=>(p.mo
 window.addEventListener('message',e=>{
  if(e.source!==window||e.data?.source!=='UAI_CANCEL_PLAYBACK_QUERY')return;
  for(const [id,controller] of activeQueries)if(id.startsWith('playback-')){controller.abort();activeQueries.delete(id)}
+ for(const session of probeSessions.values())if(session.id.startsWith('playback-'))void stopProbeSession(session)
 });
 window.addEventListener('message',async e=>{
  const m=e.data;if(e.source!==window||m?.source!=='UAI_PLAYBACK_QUERY'||!extensionEnabled)return;
@@ -149,6 +150,7 @@ window.addEventListener('message',async e=>{
   const x=await query('cosmo_getPlaylistUrl',{code:episode,playMode:'caption',bitrateLow:1500,bitrateHigh:null,validationOnly:false},hashes.playlist,ctrl.signal);
   if(ctrl.signal.aborted||!extensionEnabled||location.href!==page)return;
   const info=x?.webfront_playlistUrl;if(!info)throw Error('プレイリスト情報なし');
+  registerProbeSession(id,info);
   const profiles=(info.urlInfo||[]).flatMap(x=>x.movieProfile||[]);
   const urls=profiles.map(p=>p.playlistUrl).filter(u=>typeof u==='string'&&u.includes('.mpd')).map(str=>{const u=new URL(str);if(info.playToken)u.searchParams.set('play_token',info.playToken);return u.href});
   send({episode,mpds:[...new Set(urls)].slice(0,3)});
