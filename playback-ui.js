@@ -75,28 +75,6 @@ async function loadPlaylistHighest(){
  }finally{window.postMessage({source:'UAI_RELEASE_PROBE_SESSION',id},location.origin);if(valid())playlistBusy=false}
 }
 
-// Only keep codec details if they describe the selected resolution tier.
-// An official 4K listing does not establish the codec of its 4K stream.
-function resolveHighestVideo(mpdVideo,{fourk,dv,hasPlaylist=true}){
- const match=/^(4K UHD|Full HD|HD|\d+p)(?:\s*\(([^)]*)\))?$/.exec(mpdVideo);
- const mpdTier=match?.[1]||null;
- const officialUpgrade=fourk&&mpdTier!== '4K UHD';
- let tier=officialUpgrade?'4K UHD':mpdTier;
- if(!tier){
-  if(fourk)tier='4K UHD';
-  else return mpdVideo;
- }
- const codec=officialUpgrade?'':(match?.[2]||'');
- return tier+(dv?' Dolby Vision':'')+(codec?' ('+codec+')':'');
-}
-function resolveHighestAudio(mpdAudio,{atmos=false,dolby=false}){
- if(atmos||/^Dolby Atmos/.test(mpdAudio))return 'Dolby Atmos';
- const match=mpdAudio.match(/\((\d+(?:\.\d+)?ch)(?:・[^)]*)?\)/);
- const isDolby=/^Dolby Digital(?: Plus)?\b/.test(mpdAudio);
- if(isDolby&&match)return 'Dolby Audio ('+match[1]+' / '+mpdAudio.replace(/\s*\([^)]*\)/,'')+')';
- if(dolby)return 'Dolby Audio';
- return mpdAudio;
-}
 function draw(){
  const v=video(),w=v?.videoWidth||last?.video?.width||last?.track?.width||last?.stats?.width,h=v?.videoHeight||last?.video?.height||last?.track?.height;
  const currentVideo=q(w,h),currentAudio=last?.track?.audioCodec?trackAudio(last.track):(mseAudio()||'取得不可');
@@ -104,10 +82,10 @@ function draw(){
  const separator=' · 音声 ';
  const index=highest?.indexOf(separator)??-1;
  const baseVideo=index>=0?highest.slice(0,index).replace(/^映像 /,''):'確認中';
- const fourk=window.__uai4kMatched?.()===true,dv=window.__uaiDvMatched?.()===true;
- const highestVideo=resolveHighestVideo(baseVideo,{fourk,dv,hasPlaylist:index>=0});
- const originalHighestAudio=index>=0?highest.slice(index+separator.length):'確認中';
- const highestAudio=resolveHighestAudio(originalHighestAudio,{atmos:window.__uaiAtmosMatched?.()===true,dolby:window.__uaiDolbyAudioMatched?.()===true});
+ // Playback maximum is derived exclusively from the fetched playlist analysis.
+ // Official feature/search lists must never upgrade or replace these values.
+ const highestVideo=baseVideo;
+ const highestAudio=index>=0?highest.slice(index+separator.length):'確認中';
  for(const el of document.querySelectorAll('.'+CLS)){
   const currentCh=currentAudio.match(/\((\d+(?:\.\d+)?ch)(?:・[^)]*)?\)/);
   const readableCurrent=/Dolby Digital(?: Plus)?/.test(currentAudio)&&currentCh?'Dolby Audio ('+currentCh[1]+' / '+currentAudio.replace(/\s*\([^)]*\)/,'')+')':currentAudio;
@@ -137,7 +115,6 @@ chrome.storage.onChanged.addListener((changes,area)=>{if(area==='local'&&changes
  if(area==='local'&&changes.uaiShowPlayback){showPlayback=changes.uaiShowPlayback.newValue!==false;if(!showPlayback){resetPlaylist();document.querySelectorAll('.'+CLS).forEach(e=>e.remove())}else if(enabled)query()}});
 chrome.runtime.sendMessage({type:'UAI_GET_ENABLED'}).then(r=>setEnabled(r?.enabled!==false)).catch(()=>{});
 let scheduled=false;
-window.addEventListener('UAI_DV_UPDATED',draw);
 new MutationObserver(()=>{if(scheduled)return;scheduled=true;setTimeout(()=>{scheduled=false;mount()},350)}).observe(document.documentElement,{childList:true,subtree:true});
 setInterval(()=>{if(enabled)query()},2500);
 reinject();setTimeout(query,500);
