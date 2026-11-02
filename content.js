@@ -250,7 +250,7 @@ const finalNote=[videoCaution,capability.note].filter(Boolean).join('\n');
 render('解析完了',audioMain,audioSub,videoMain,videoSub,finalNote,detail+'\n再生対応判定: '+capability.detail);
 busy=false;
 }
-catch(e){fail(e)}}
+catch(e){fail(e)}finally{window.postMessage({source:'UAI_RELEASE_PROBE_SESSION',id:String(id)},location.origin)}}
 function setOfficialHelpLinksFromFeatures(){
  const sh=rootOf();if(!sh)return;
  const dolby=window.__uaiAtmosMatched?.()===true||window.__uaiDolbyAudioMatched?.()===true;
