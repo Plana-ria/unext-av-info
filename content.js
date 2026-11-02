@@ -30,7 +30,8 @@ function setMetric(kind,main,sub,official,diff){
  primary.hidden=diff;subtitle.hidden=diff;
  if(diff){
   officialValue.textContent=official;
-  officialSub.textContent=kind==='a'?'チャンネル数・コーデック：公式情報に記載なし':'解像度・コーデック：公式情報に記載なし';
+  officialSub.textContent='';
+  officialSub.hidden=true;
   if(kind==='a'&&/^音声 \((.+)\)$/.test(main)&&sub==='AAC'){
    analyzedValue.textContent='AAC ('+main.match(/^音声 \((.+)\)$/)[1]+')';
    analyzedSub.textContent='';
